@@ -1,41 +1,56 @@
-# Realtime Chatroom: Vercel + Supabase + NVIDIA AI
+# Realtime Chatroom with Jarvis V11
 
-Ito ay demo realtime chatroom gamit ang:
+Next.js + Supabase Realtime + NVIDIA AI chatroom with Messenger-style UI, Jarvis games, trivia, join/left notifications, all-time scoring, top-score confetti, and anti-dummy participant rules.
 
-- Next.js App Router for Vercel hosting
-- Supabase Postgres + Realtime for live messages
-- NVIDIA NIM/OpenAI-compatible Chat Completions endpoint for optional AI replies
+## V11 update
 
-## Features
+Added:
 
-- Realtime public chatroom
-- Guest display name saved in browser localStorage
-- Online presence count
-- `/ai your question` command para magtanong sa NVIDIA AI
-- Mobile-friendly UI
+- Required participant name before the message box can be used.
+- No more automatic `Guest` name for first-time users.
+- Duplicate online names are automatically renamed with suffixes like `Juan 1`, `Juan 2`, `Juan 3`.
+- Reserved names are blocked: `Jarvis`, `System`, `Guest`, `Admin`, `Administrator`, and `Moderator`.
+- Anti-dummy rules and actions card in the sidebar.
+- Join/left activity still appears in the chat for visibility.
+- User list click now highlights the participant only; sending is locked to the confirmed logged-in name to reduce impersonation.
 
-## 1. Create Supabase project
+## Previous features included
 
-1. Go to Supabase and create a new project.
-2. Open **SQL Editor**.
-3. Paste and run `supabase/schema.sql`.
-4. Go to **Project Settings > API** and copy:
-   - Project URL
-   - anon public key
+- Messenger-style UI.
+- User list with scrollbar.
+- Unique username colors.
+- Jarvis automatic chat replies.
+- Jarvis game every 2 minutes.
+- Jarvis reveals answer after 1 minute if nobody answers correctly.
+- Random trivia every 5 minutes.
+- Welcome message for newly joined users.
+- Join/left notifications.
+- Score system for first correct answer.
+- Persistent all-time scoreboard using Supabase.
+- Confetti when there is a new or higher top score.
 
-## 2. Create local env file
+## Important Supabase step
 
-Create `.env.local`:
+If you already ran the V9/V10 `repair.sql`, no new SQL is required for V11.
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-NVIDIA_API_KEY=your-nvidia-api-key
-NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL=meta/llama-3.1-70b-instruct
+If your scoreboard is not working yet, run this in Supabase SQL Editor:
+
+```sql
+-- copy and run supabase/repair.sql
 ```
 
-## 3. Run locally
+The repair script safely adds or updates:
+
+- `messages` table columns for Jarvis events
+- `user_scores` table
+- `score_events` table
+- `award_score_once()` function
+- scoreboard read policy
+- realtime publication for messages and user scores
+
+Safe ito kahit existing na yung old tables mo.
+
+## Local run
 
 ```bash
 npm install
@@ -48,27 +63,52 @@ Open:
 http://localhost:3000
 ```
 
-## 4. Deploy to Vercel
+## Environment variables
 
-1. Push this folder to GitHub.
-2. Import the repo in Vercel.
-3. Add the same environment variables in **Vercel Project Settings > Environment Variables**.
-4. Deploy.
+Create `.env.local` or `.env`:
 
-## Usage
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-Normal chat:
-
-```text
-Hello everyone!
+NVIDIA_API_KEY=your-nvidia-api-key
+NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
+NVIDIA_MODEL=meta/llama-3.1-8b-instruct
 ```
 
-Ask AI:
+Do not upload `.env.local` or `.env` to GitHub.
 
-```text
-/ai gumawa ka ng short marketing caption para sa laundry POS system
+## Updating existing project
+
+Replace these from the ZIP:
+
+- `app/`
+- `README.md`
+
+Optional lang palitan ang `supabase/` kung updated ka na sa V9/V10 SQL.
+
+Do not delete:
+
+- `.env`
+- `.env.local`
+- `.git/`
+- `node_modules/`
+
+Then restart:
+
+```powershell
+CTRL + C
+npm run dev
 ```
 
-## Important security note
+## Deploy update
 
-The Supabase SQL policies here are for demo only. Anyone with the anon key can read and insert messages. For production, add real authentication and stricter RLS policies.
+After testing locally:
+
+```powershell
+git add .
+git commit -m "Add required names and anti-dummy rules"
+git push
+```
+
+Vercel will redeploy automatically if connected to GitHub.

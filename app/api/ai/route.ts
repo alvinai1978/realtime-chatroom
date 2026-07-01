@@ -2,61 +2,109 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+const DEFAULT_BASE_URL = 'https://integrate.api.nvidia.com/v1';
+const DEFAULT_MODEL = 'meta/llama-3.1-8b-instruct';
+
+type ChatHistoryItem = {
+  user_name?: string;
+  content?: string;
+  is_ai?: boolean;
+};
+
 type ChatRequest = {
   message?: string;
   room?: string;
   userName?: string;
+  history?: ChatHistoryItem[];
 };
+
+function cleanDetail(value: unknown) {
+  if (!value) return '';
+  let text = typeof value === 'string' ? value : JSON.stringify(value);
+  text = text.replace(/Bearer\s+[A-Za-z0-9._-]+/g, 'Bearer [hidden]');
+  text = text.replace(/nvapi-[A-Za-z0-9._-]+/g, 'nvapi-[hidden]');
+  return text.slice(0, 600);
+}
+
+async function readResponseDetails(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  try {
+    if (contentType.includes('application/json')) {
+      return cleanDetail(await response.json());
+    }
+    return cleanDetail(await response.text());
+  } catch {
+    return 'Could not read error details from NVIDIA response.';
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ChatRequest;
     const message = String(body.message || '').trim();
     const userName = String(body.userName || 'Guest').trim().slice(0, 40);
+    const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
     }
 
-    if (!process.env.NVIDIA_API_KEY) {
+    const apiKey = process.env.NVIDIA_API_KEY;
+    if (!apiKey || apiKey.includes('your-') || apiKey.includes('xxxxx')) {
       return NextResponse.json(
-        { error: 'Missing NVIDIA_API_KEY in environment variables.' },
+        {
+          error: 'Missing or placeholder NVIDIA_API_KEY.',
+          details: 'Open your .env or .env.local file and paste your real NVIDIA API key, then restart npm run dev.'
+        },
         { status: 500 }
       );
     }
 
-    const baseUrl = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
-    const model = process.env.NVIDIA_MODEL || 'meta/llama-3.1-70b-instruct';
+    const baseUrl = (process.env.NVIDIA_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
+    const model = process.env.NVIDIA_MODEL || DEFAULT_MODEL;
+
+    const conversationHistory = history.map((item) => ({
+      role: item.is_ai ? 'assistant' : 'user',
+      content: `${item.user_name || 'Guest'}: ${item.content || ''}`
+    }));
 
     const nvidiaResponse = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model,
-        temperature: 0.4,
-        max_tokens: 400,
+        temperature: 0.55,
+        max_tokens: 160,
         messages: [
           {
             role: 'system',
             content:
-              'You are a helpful AI assistant inside a Filipino realtime chatroom. Reply in friendly Taglish unless the user asks otherwise. Keep answers clear and not too long.'
+              'Your name is Jarvis. You are an AI participant inside a Filipino realtime chatroom. Join the conversation naturally, answer questions, welcome users, and comment when useful. Reply in friendly Taglish unless asked otherwise. Keep replies short, warm, and clear. You also run simple games and trivia in the chatroom, but do not over-explain. Do not mention that users need to type /ai.'
           },
+          ...conversationHistory,
           {
             role: 'user',
-            content: `${userName} asked: ${message}`
+            content: `${userName}: ${message}`
           }
         ]
-      })
+      }),
+      signal: AbortSignal.timeout(45000)
     });
 
     if (!nvidiaResponse.ok) {
-      const errorText = await nvidiaResponse.text();
+      const details = await readResponseDetails(nvidiaResponse);
+      console.error('[Jarvis AI] NVIDIA API failed:', nvidiaResponse.status, details);
       return NextResponse.json(
-        { error: 'NVIDIA API request failed.', details: errorText },
-        { status: nvidiaResponse.status }
+        {
+          error: `NVIDIA API request failed with status ${nvidiaResponse.status}.`,
+          details,
+          model,
+          baseUrl
+        },
+        { status: 500 }
       );
     }
 
@@ -65,8 +113,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ reply });
   } catch (error) {
+    const detail = error instanceof Error ? error.message : cleanDetail(error) || 'Unexpected server error.';
+    console.error('[Jarvis AI] Route error:', detail);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unexpected server error.' },
+      {
+        error: 'Jarvis AI route failed.',
+        details: detail
+      },
       { status: 500 }
     );
   }
