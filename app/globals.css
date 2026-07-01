@@ -1,0 +1,263 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(circle at top left, #233a75, transparent 34%),
+    linear-gradient(135deg, #07101f 0%, #111827 45%, #1f2937 100%);
+  color: #f8fafc;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.page-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.chat-card {
+  width: min(980px, 100%);
+  height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(18px);
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 28px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.eyebrow,
+.online-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #93c5fd;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.chat-header h1 {
+  margin: 8px 0;
+  font-size: clamp(30px, 5vw, 54px);
+  line-height: 1;
+}
+
+.chat-header p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.online-pill {
+  align-self: flex-start;
+  white-space: nowrap;
+  padding: 10px 14px;
+  color: #dbeafe;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(147, 197, 253, 0.22);
+  border-radius: 999px;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  background: rgba(15, 23, 42, 0.72);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.profile-row label {
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.profile-row input,
+.composer input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  outline: none;
+  color: #f8fafc;
+  background: rgba(2, 6, 23, 0.58);
+  border-radius: 16px;
+}
+
+.profile-row input {
+  padding: 10px 12px;
+}
+
+.profile-row button,
+.composer button {
+  border: 0;
+  cursor: pointer;
+  color: white;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border-radius: 16px;
+  font-weight: 800;
+}
+
+.profile-row button {
+  padding: 10px 14px;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 24px 28px;
+}
+
+.empty-state {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.message {
+  max-width: 76%;
+  align-self: flex-start;
+  padding: 14px 16px;
+  border-radius: 20px 20px 20px 4px;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.own-message {
+  align-self: flex-end;
+  border-radius: 20px 20px 4px 20px;
+  background: rgba(37, 99, 235, 0.88);
+}
+
+.ai-message {
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.18), rgba(124, 58, 237, 0.22));
+  border-color: rgba(94, 234, 212, 0.24);
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 6px;
+  color: rgba(226, 232, 240, 0.84);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.message-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.message p {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.composer input {
+  padding: 15px 16px;
+}
+
+.composer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.composer button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.composer .ai-send {
+  background: linear-gradient(135deg, #0d9488, #7c3aed);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 700px) {
+  .page-shell {
+    padding: 0;
+  }
+
+  .chat-card {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .chat-header,
+  .profile-row {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chat-header {
+    flex-direction: column;
+  }
+
+  .messages {
+    padding: 16px;
+  }
+
+  .message {
+    max-width: 92%;
+  }
+
+  .profile-row {
+    grid-template-columns: 1fr;
+  }
+
+  .composer {
+    grid-template-columns: 1fr;
+  }
+
+  .composer button {
+    justify-content: center;
+    padding: 14px;
+  }
+}
