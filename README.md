@@ -1,69 +1,38 @@
-# Realtime Chatroom with Jarvis V11
+# Realtime Chatroom Jarvis v12
 
-Next.js + Supabase Realtime + NVIDIA AI chatroom with Messenger-style UI, Jarvis games, trivia, join/left notifications, all-time scoring, top-score confetti, and anti-dummy participant rules.
+Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, at NVIDIA AI.
 
-## V11 update
+## New in v12
 
-Added:
+- Mas compatible sa cellphone at tablet.
+- Mas malaking visible chat area para mas maraming messages ang kita.
+- Fixed/stable ang message box sa baba ng chat panel.
+- Scrollable pa rin ang user list kapag dumami ang participants.
+- Hindi na paulit-ulit agad ang game questions ni Jarvis.
+- Mas marami nang question bank si Jarvis.
+- Fixed duplicate Jarvis AI reply issue.
 
-- Required participant name before the message box can be used.
-- No more automatic `Guest` name for first-time users.
-- Duplicate online names are automatically renamed with suffixes like `Juan 1`, `Juan 2`, `Juan 3`.
-- Reserved names are blocked: `Jarvis`, `System`, `Guest`, `Admin`, `Administrator`, and `Moderator`.
-- Anti-dummy rules and actions card in the sidebar.
-- Join/left activity still appears in the chat for visibility.
-- User list click now highlights the participant only; sending is locked to the confirmed logged-in name to reduce impersonation.
+## Features
 
-## Previous features included
+- Required participant name bago makapag-chat.
+- Duplicate names auto-add 1, 2, 3, and so on.
+- Reserved names like Jarvis, System, Guest, Admin are blocked.
+- Jarvis automatically joins the conversation.
+- Jarvis asks games every 2 minutes and reveals the answer after 1 minute.
+- Jarvis posts random trivia every 5 minutes.
+- User score system with all-time top score.
+- Confetti celebration for top scorer.
+- Join and left notifications.
 
-- Messenger-style UI.
-- User list with scrollbar.
-- Unique username colors.
-- Jarvis automatic chat replies.
-- Jarvis game every 2 minutes.
-- Jarvis reveals answer after 1 minute if nobody answers correctly.
-- Random trivia every 5 minutes.
-- Welcome message for newly joined users.
-- Join/left notifications.
-- Score system for first correct answer.
-- Persistent all-time scoreboard using Supabase.
-- Confetti when there is a new or higher top score.
+## Supabase
 
-## Important Supabase step
-
-If you already ran the V9/V10 `repair.sql`, no new SQL is required for V11.
-
-If your scoreboard is not working yet, run this in Supabase SQL Editor:
-
-```sql
--- copy and run supabase/repair.sql
-```
-
-The repair script safely adds or updates:
-
-- `messages` table columns for Jarvis events
-- `user_scores` table
-- `score_events` table
-- `award_score_once()` function
-- scoreboard read policy
-- realtime publication for messages and user scores
-
-Safe ito kahit existing na yung old tables mo.
-
-## Local run
-
-```bash
-npm install
-npm run dev
-```
-
-Open:
+Run this in Supabase SQL Editor if hindi mo pa na-run ang latest database update:
 
 ```text
-http://localhost:3000
+supabase/repair.sql
 ```
 
-## Environment variables
+## Local setup
 
 Create `.env.local` or `.env`:
 
@@ -76,39 +45,19 @@ NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_MODEL=meta/llama-3.1-8b-instruct
 ```
 
-Do not upload `.env.local` or `.env` to GitHub.
+Run:
 
-## Updating existing project
-
-Replace these from the ZIP:
-
-- `app/`
-- `README.md`
-
-Optional lang palitan ang `supabase/` kung updated ka na sa V9/V10 SQL.
-
-Do not delete:
-
-- `.env`
-- `.env.local`
-- `.git/`
-- `node_modules/`
-
-Then restart:
-
-```powershell
-CTRL + C
+```bash
+npm install
 npm run dev
 ```
 
-## Deploy update
+Open:
 
-After testing locally:
-
-```powershell
-git add .
-git commit -m "Add required names and anti-dummy rules"
-git push
+```text
+http://localhost:3000
 ```
 
-Vercel will redeploy automatically if connected to GitHub.
+## Deploy to Vercel
+
+Push to GitHub, then redeploy in Vercel. Make sure the same environment variables are added in Vercel Project Settings.

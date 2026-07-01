@@ -52,58 +52,59 @@ const JARVIS_NAME = 'Jarvis';
 const GAME_INTERVAL_MS = 120000;
 const GAME_ANSWER_DELAY_MS = 60000;
 const TRIVIA_INTERVAL_MS = 300000;
+const QUESTION_REPEAT_WINDOW = 20;
 
 const jarvisQuestions: JarvisQuestion[] = [
-  {
-    question: '🎮 Jarvis Game: Ano ang kulay ng langit kapag maaraw?',
-    answers: ['asul', 'blue'],
-    displayAnswer: 'asul / blue'
-  },
-  {
-    question: '🎮 Jarvis Game: Ilang araw meron sa isang linggo?',
-    answers: ['7', 'pito', 'seven'],
-    displayAnswer: '7 / pito'
-  },
-  {
-    question: '🎮 Jarvis Game: Ano ang kabaliktaran ng malamig?',
-    answers: ['mainit', 'hot'],
-    displayAnswer: 'mainit'
-  },
-  {
-    question: '🎮 Jarvis Game: Anong hayop ang tumatahol?',
-    answers: ['aso', 'dog'],
-    displayAnswer: 'aso / dog'
-  },
-  {
-    question: '🎮 Jarvis Game: Ilang daliri meron sa isang kamay?',
-    answers: ['5', 'lima', 'five'],
-    displayAnswer: '5 / lima'
-  },
-  {
-    question: '🎮 Jarvis Game: Ano ang ginagamit natin para magsulat?',
-    answers: ['lapis', 'pencil', 'ballpen', 'pen'],
-    displayAnswer: 'lapis o ballpen'
-  },
-  {
-    question: '🎮 Jarvis Game: Ano ang tawag sa bahay ng ibon?',
-    answers: ['pugad', 'nest'],
-    displayAnswer: 'pugad / nest'
-  },
-  {
-    question: '🎮 Jarvis Game: Kung may 2 mansanas ka at binigyan ka pa ng 1, ilan na lahat?',
-    answers: ['3', 'tatlo', 'three'],
-    displayAnswer: '3 / tatlo'
-  },
-  {
-    question: '🎮 Jarvis Game: Ano ang unang buwan ng taon?',
-    answers: ['enero', 'january'],
-    displayAnswer: 'Enero / January'
-  },
-  {
-    question: '🎮 Jarvis Game: Anong gamit ang ginagamit para makita ang oras?',
-    answers: ['orasan', 'relo', 'clock', 'watch'],
-    displayAnswer: 'orasan / relo'
-  }
+  { question: '🎮 Jarvis Game: Ano ang kulay ng langit kapag maaraw?', answers: ['asul', 'blue'], displayAnswer: 'asul / blue' },
+  { question: '🎮 Jarvis Game: Ilang araw meron sa isang linggo?', answers: ['7', 'pito', 'seven'], displayAnswer: '7 / pito' },
+  { question: '🎮 Jarvis Game: Ano ang kabaliktaran ng malamig?', answers: ['mainit', 'hot'], displayAnswer: 'mainit' },
+  { question: '🎮 Jarvis Game: Anong hayop ang tumatahol?', answers: ['aso', 'dog'], displayAnswer: 'aso / dog' },
+  { question: '🎮 Jarvis Game: Ilang daliri meron sa isang kamay?', answers: ['5', 'lima', 'five'], displayAnswer: '5 / lima' },
+  { question: '🎮 Jarvis Game: Ano ang ginagamit natin para magsulat?', answers: ['lapis', 'pencil', 'ballpen', 'pen'], displayAnswer: 'lapis o ballpen' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa bahay ng ibon?', answers: ['pugad', 'nest'], displayAnswer: 'pugad / nest' },
+  { question: '🎮 Jarvis Game: Kung may 2 mansanas ka at binigyan ka pa ng 1, ilan na lahat?', answers: ['3', 'tatlo', 'three'], displayAnswer: '3 / tatlo' },
+  { question: '🎮 Jarvis Game: Ano ang unang buwan ng taon?', answers: ['enero', 'january'], displayAnswer: 'Enero / January' },
+  { question: '🎮 Jarvis Game: Anong gamit ang ginagamit para makita ang oras?', answers: ['orasan', 'relo', 'clock', 'watch'], displayAnswer: 'orasan / relo' },
+  { question: '🎮 Jarvis Game: Ano ang kulay ng hinog na saging?', answers: ['dilaw', 'yellow'], displayAnswer: 'dilaw / yellow' },
+  { question: '🎮 Jarvis Game: Ilang buwan meron sa isang taon?', answers: ['12', 'labindalawa', 'twelve'], displayAnswer: '12 / labindalawa' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa anak ng pusa?', answers: ['kuting', 'kitten'], displayAnswer: 'kuting / kitten' },
+  { question: '🎮 Jarvis Game: Anong bahagi ng katawan ang ginagamit sa pakikinig?', answers: ['tainga', 'ear', 'ears'], displayAnswer: 'tainga / ears' },
+  { question: '🎮 Jarvis Game: Anong planeta ang tinatawag na Red Planet?', answers: ['mars'], displayAnswer: 'Mars' },
+  { question: '🎮 Jarvis Game: Ano ang pambansang wika ng Pilipinas?', answers: ['filipino', 'tagalog'], displayAnswer: 'Filipino' },
+  { question: '🎮 Jarvis Game: Ilang oras meron sa isang araw?', answers: ['24', 'dalawamput apat', 'twenty four'], displayAnswer: '24 oras' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa malalaking anyong tubig na maalat?', answers: ['dagat', 'sea', 'ocean', 'karagatan'], displayAnswer: 'dagat / karagatan' },
+  { question: '🎮 Jarvis Game: Ano ang ginagamit para magputol ng papel?', answers: ['gunting', 'scissors'], displayAnswer: 'gunting / scissors' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa taong nagtuturo sa paaralan?', answers: ['guro', 'teacher'], displayAnswer: 'guro / teacher' },
+  { question: '🎮 Jarvis Game: Ano ang pinakamalaking planeta sa solar system?', answers: ['jupiter'], displayAnswer: 'Jupiter' },
+  { question: '🎮 Jarvis Game: Ilang letra meron sa salitang ARAW?', answers: ['4', 'apat', 'four'], displayAnswer: '4 / apat' },
+  { question: '🎮 Jarvis Game: Ano ang ginagawa ng isda para makahinga sa tubig?', answers: ['hasang', 'gills'], displayAnswer: 'hasang / gills' },
+  { question: '🎮 Jarvis Game: Anong kulay ang pinaghalo ng pula at puti?', answers: ['pink', 'rosas'], displayAnswer: 'pink / rosas' },
+  { question: '🎮 Jarvis Game: Ilang paa meron ang manok?', answers: ['2', 'dalawa', 'two'], displayAnswer: '2 / dalawa' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa lugar kung saan nag-aaral ang mga bata?', answers: ['paaralan', 'school', 'eskwela'], displayAnswer: 'paaralan / school' },
+  { question: '🎮 Jarvis Game: Ano ang ginagamit para uminom ng tubig?', answers: ['baso', 'glass', 'cup'], displayAnswer: 'baso / cup' },
+  { question: '🎮 Jarvis Game: Ano ang kabaliktaran ng mataas?', answers: ['mababa', 'low'], displayAnswer: 'mababa' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa bilog na bagay na ginagamit sa basketball?', answers: ['bola', 'ball'], displayAnswer: 'bola / ball' },
+  { question: '🎮 Jarvis Game: Anong prutas ang karaniwang pula at may buto sa gitna?', answers: ['mansanas', 'apple'], displayAnswer: 'mansanas / apple' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa hayop na may mahabang leeg?', answers: ['giraffe', 'dyirap'], displayAnswer: 'giraffe / dyirap' },
+  { question: '🎮 Jarvis Game: Ilang minuto meron sa isang oras?', answers: ['60', 'animnapu', 'sixty'], displayAnswer: '60 minuto' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa tubig na bumabagsak mula sa ulap?', answers: ['ulan', 'rain'], displayAnswer: 'ulan / rain' },
+  { question: '🎮 Jarvis Game: Ano ang ginagamit para maglinis ng ngipin?', answers: ['toothbrush', 'sipilyo'], displayAnswer: 'toothbrush / sipilyo' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa pagkain sa umaga?', answers: ['almusal', 'breakfast'], displayAnswer: 'almusal / breakfast' },
+  { question: '🎮 Jarvis Game: Ano ang kabaliktaran ng araw?', answers: ['gabi', 'night'], displayAnswer: 'gabi / night' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa ilaw sa kalangitan kapag gabi?', answers: ['buwan', 'moon', 'bituin', 'star'], displayAnswer: 'buwan o bituin' },
+  { question: '🎮 Jarvis Game: Ilang kulay meron sa rainbow na karaniwang tinuturo?', answers: ['7', 'pito', 'seven'], displayAnswer: '7 / pito' },
+  { question: '🎮 Jarvis Game: Ano ang hayop na may shell at mabagal maglakad?', answers: ['pagong', 'turtle'], displayAnswer: 'pagong / turtle' },
+  { question: '🎮 Jarvis Game: Anong gamit ang ginagamit para buksan ang pinto?', answers: ['susi', 'key'], displayAnswer: 'susi / key' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa malaking libro na may kahulugan ng mga salita?', answers: ['diksyunaryo', 'dictionary'], displayAnswer: 'diksyunaryo / dictionary' },
+  { question: '🎮 Jarvis Game: Ano ang kabaliktaran ng mabilis?', answers: ['mabagal', 'slow'], displayAnswer: 'mabagal / slow' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa taong nagmamaneho ng sasakyan?', answers: ['driver', 'drayber'], displayAnswer: 'driver / drayber' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa bahay ng aso?', answers: ['doghouse', 'kulungan', 'bahay aso'], displayAnswer: 'doghouse / kulungan' },
+  { question: '🎮 Jarvis Game: Anong number ang kasunod ng 9?', answers: ['10', 'sampu', 'ten'], displayAnswer: '10 / sampu' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa taong gumagamot sa may sakit?', answers: ['doktor', 'doctor'], displayAnswer: 'doktor / doctor' },
+  { question: '🎮 Jarvis Game: Ano ang ginagamit para magluto ng kanin?', answers: ['rice cooker', 'kaldero', 'kaserola'], displayAnswer: 'rice cooker / kaldero' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa maliliit na ilaw sa langit kapag gabi?', answers: ['bituin', 'stars', 'star'], displayAnswer: 'bituin / stars' },
+  { question: '🎮 Jarvis Game: Anong hayop ang kilala sa pagsasabi ng meow?', answers: ['pusa', 'cat'], displayAnswer: 'pusa / cat' },
+  { question: '🎮 Jarvis Game: Ano ang tawag sa sasakyang lumilipad?', answers: ['eroplano', 'airplane', 'plane'], displayAnswer: 'eroplano / airplane' }
 ];
 
 const jarvisTrivia = [
@@ -270,6 +271,32 @@ function toReadableError(error: unknown, fallback = 'Unknown error') {
 function getQuestionBySlot(slot?: number | null) {
   if (slot === null || slot === undefined) return null;
   return jarvisQuestions[Math.abs(slot) % jarvisQuestions.length];
+}
+
+function pickQuestionForSlot(slot: number, currentMessages: Message[]) {
+  const recentQuestionTexts = new Set(
+    [...currentMessages]
+      .reverse()
+      .filter((message) =>
+        message.user_name === JARVIS_NAME &&
+        (message.event_type === 'game_question' || message.content.startsWith('🎮 Jarvis Game:'))
+      )
+      .slice(0, QUESTION_REPEAT_WINDOW)
+      .map((message) => normalizeText(message.content))
+  );
+
+  const startIndex = Math.abs((slot * 7 + Math.floor(slot / jarvisQuestions.length) * 11) % jarvisQuestions.length);
+
+  for (let offset = 0; offset < jarvisQuestions.length; offset += 1) {
+    const questionIndex = (startIndex + offset) % jarvisQuestions.length;
+    const question = jarvisQuestions[questionIndex];
+
+    if (!recentQuestionTexts.has(normalizeText(question.question))) {
+      return { questionIndex, question };
+    }
+  }
+
+  return { questionIndex: startIndex, question: jarvisQuestions[startIndex] };
 }
 
 function messageMatchesAnswer(message: string, question: JarvisQuestion) {
@@ -528,7 +555,7 @@ export default function HomePage() {
         .select('*')
         .eq('room', ROOM_NAME)
         .order('created_at', { ascending: true })
-        .limit(180);
+        .limit(250);
 
       if (!error && data) setMessages(data as Message[]);
     }
@@ -550,7 +577,7 @@ export default function HomePage() {
           const newMessage = payload.new as Message;
           setMessages((current) => {
             if (current.some((message) => message.id === newMessage.id)) return current;
-            return [...current, newMessage].slice(-180);
+            return [...current, newMessage].slice(-250);
           });
         }
       )
@@ -686,13 +713,13 @@ export default function HomePage() {
     }
   }
 
-  async function awardScoreOnce(userName: string, gameSlot?: number | null) {
+  async function awardScoreOnce(userName: string, gameEventKey?: string | number | null) {
     const safeName = cleanName(userName);
     if (!safeName || safeName === JARVIS_NAME || safeName === 'System') return false;
 
     try {
       const { data, error } = await supabase.rpc('award_score_once', {
-        p_event_key: `score-game-${gameSlot ?? 'unknown'}`,
+        p_event_key: `score-${String(gameEventKey ?? 'unknown')}`,
         p_user_name: safeName,
         p_points: 1
       });
@@ -831,11 +858,11 @@ export default function HomePage() {
 
     if (lastGame && Date.now() - new Date(lastGame.created_at).getTime() < GAME_INTERVAL_MS - 5000) return;
 
-    const question = jarvisQuestions[slot % jarvisQuestions.length];
+    const { questionIndex, question } = pickQuestionForSlot(slot, currentMessages);
 
     await insertUniqueEvent(question.question, JARVIS_NAME, `game-question-${slot}`, 'game_question', {
       isAi: true,
-      gameSlot: slot
+      gameSlot: questionIndex
     });
 
     localStorage.setItem('jarvis_last_game_slot', String(slot));
@@ -852,6 +879,7 @@ export default function HomePage() {
     if (Date.now() - askedAt < GAME_ANSWER_DELAY_MS) return;
 
     const gameSlot = gameMessage.game_slot ?? 0;
+    const gameEventKey = gameMessage.event_key || `game-${gameMessage.id || gameSlot}`;
     const currentMessages = messagesRef.current;
     const correctGuess = currentMessages.find((message) => {
       const messageTime = new Date(message.created_at).getTime();
@@ -867,13 +895,13 @@ export default function HomePage() {
       const winnerMessage = await insertUniqueEvent(
         `Tama, ${correctGuess.user_name}! 🎉 +1 score! Ang sagot ay: ${question.displayAnswer}.`,
         JARVIS_NAME,
-        `game-winner-${gameSlot}`,
+        `game-winner-${gameEventKey}`,
         'game_winner',
         { isAi: true, replyToMessageId: gameMessage.id }
       );
 
       if (winnerMessage) {
-        await awardScoreOnce(correctGuess.user_name, gameSlot);
+        await awardScoreOnce(correctGuess.user_name, gameEventKey);
       }
 
       return;
@@ -882,7 +910,7 @@ export default function HomePage() {
     await insertUniqueEvent(
       `⏰ Time's up! Walang naka-hula. Ang tamang sagot ay: ${question.displayAnswer}.`,
       JARVIS_NAME,
-      `game-answer-${gameSlot}`,
+      `game-answer-${gameEventKey}`,
       'game_answer',
       { isAi: true, replyToMessageId: gameMessage.id }
     );
@@ -900,16 +928,17 @@ export default function HomePage() {
     if (!messageMatchesAnswer(rawMessage, question)) return false;
 
     const gameSlot = gameMessage.game_slot ?? 0;
+    const gameEventKey = gameMessage.event_key || `game-${gameMessage.id || gameSlot}`;
     const winnerMessage = await insertUniqueEvent(
       `Tama, ${activeSender}! 🎉 +1 score! Ang sagot ay: ${question.displayAnswer}.`,
       JARVIS_NAME,
-      `game-winner-${gameSlot}`,
+      `game-winner-${gameEventKey}`,
       'game_winner',
       { isAi: true, replyToMessageId: gameMessage.id }
     );
 
     if (winnerMessage) {
-      await awardScoreOnce(activeSender, gameSlot);
+      await awardScoreOnce(activeSender, gameEventKey);
     }
 
     return true;
@@ -1005,7 +1034,7 @@ export default function HomePage() {
           <div className="top-score-toast">{celebrationText}</div>
         </div>
       ) : null}
-      <aside className="sidebar">
+      <aside className={`sidebar ${myName ? 'joined' : 'needs-name'}`}>
         <div className="brand-card">
           <div className="jarvis-avatar"><Bot size={24} /></div>
           <div>
@@ -1173,7 +1202,7 @@ export default function HomePage() {
           />
           <button type="submit" disabled={!myName || !input.trim() || isSending}>
             {isSending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
-            Send
+            <span className="send-label">Send</span>
           </button>
         </form>
       </section>
