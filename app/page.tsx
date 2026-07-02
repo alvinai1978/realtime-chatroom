@@ -84,6 +84,14 @@ const GAME_ANSWER_DELAY_MS = 60000;
 const TRIVIA_INTERVAL_MS = 300000;
 const QUESTION_REPEAT_WINDOW = 20;
 const BINGO_CALL_INTERVAL_MS = 8000;
+const BINGO_WIN_SCORE = 50;
+const BINGO_MARK_COLORS = [
+  { key: 'blue', label: 'Blue', fill: 'rgba(10, 124, 255, 0.34)', border: 'rgba(10, 124, 255, 0.65)' },
+  { key: 'purple', label: 'Purple', fill: 'rgba(124, 58, 237, 0.34)', border: 'rgba(124, 58, 237, 0.65)' },
+  { key: 'pink', label: 'Pink', fill: 'rgba(225, 29, 72, 0.32)', border: 'rgba(225, 29, 72, 0.62)' },
+  { key: 'green', label: 'Green', fill: 'rgba(5, 150, 105, 0.30)', border: 'rgba(5, 150, 105, 0.60)' },
+  { key: 'orange', label: 'Orange', fill: 'rgba(234, 88, 12, 0.32)', border: 'rgba(234, 88, 12, 0.62)' }
+] as const;
 const BINGO_COLUMNS = [
   { letter: 'B', min: 1, max: 15 },
   { letter: 'I', min: 16, max: 30 },
@@ -616,6 +624,7 @@ export default function HomePage() {
   const [isBingoParticipant, setIsBingoParticipant] = useState(false);
   const [bingoMarkedNumbers, setBingoMarkedNumbers] = useState<number[]>([]);
   const [bingoNotice, setBingoNotice] = useState('');
+  const [bingoMarkColor, setBingoMarkColor] = useState('blue');
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const currentPresenceKeyRef = useRef('');
@@ -656,6 +665,18 @@ export default function HomePage() {
   const canJoinActiveBingo = useMemo(
     () => Boolean(activeBingoRound && myName && isBingoEligiblePlayer(activeBingoRound, myName)),
     [activeBingoRound?.roundId, activeBingoRound?.eligiblePlayers.join('|'), myName]
+  );
+
+  const selectedBingoMarkColor =
+    BINGO_MARK_COLORS.find((color) => color.key === bingoMarkColor) || BINGO_MARK_COLORS[0];
+
+  const bingoMarkStyle = useMemo(
+    () =>
+      ({
+        '--bingo-mark-fill': selectedBingoMarkColor.fill,
+        '--bingo-mark-border': selectedBingoMarkColor.border
+      }) as CSSProperties,
+    [selectedBingoMarkColor.fill, selectedBingoMarkColor.border]
   );
 
   function getTakenParticipantNames(currentName = myName) {
@@ -712,6 +733,43 @@ export default function HomePage() {
 
   function saveBingoMarks(roundId: string, userName: string, marks: number[]) {
     localStorage.setItem(`bingo_marks_${roundId}_${userName}`, JSON.stringify(marks));
+  }
+
+  function changeBingoMarkColor(colorKey: string) {
+    if (!BINGO_MARK_COLORS.some((color) => color.key === colorKey)) return;
+    setBingoMarkColor(colorKey);
+    localStorage.setItem('bingo_mark_color', colorKey);
+  }
+
+  function leaveBingoRound() {
+    if (!activeBingoRound || !myName) return;
+
+    localStorage.removeItem(`bingo_joined_${activeBingoRound.roundId}_${myName}`);
+    localStorage.removeItem(`bingo_marks_${activeBingoRound.roundId}_${myName}`);
+    setIsBingoParticipant(false);
+    setBingoMarkedNumbers([]);
+    setTemporaryBingoNotice('Umalis ka sa Bingo. Pwede kang sumali ulit habang eligible pa ang round.');
+  }
+
+  function logoutChatroom() {
+    const currentName = myName;
+
+    if (activeBingoRound && currentName) {
+      localStorage.removeItem(`bingo_joined_${activeBingoRound.roundId}_${currentName}`);
+      localStorage.removeItem(`bingo_marks_${activeBingoRound.roundId}_${currentName}`);
+    }
+
+    channelRef.current?.untrack();
+    localStorage.removeItem('chat_user_name');
+    setMyName('');
+    setNameDraft('');
+    setSelectedSender('');
+    setInput('');
+    setNameError('');
+    setNameNotice('Logged out. Enter your name to join again.');
+    setIsBingoParticipant(false);
+    setBingoMarkedNumbers([]);
+    setIsBingoOpen(false);
   }
 
   function joinBingoRound() {
@@ -836,7 +894,7 @@ export default function HomePage() {
 
     if (winningPattern) {
       const winnerMessage = await insertUniqueEvent(
-        `🏆 BINGO verified! ${myName} wins Round ${activeBingoRound.roundId} with ${winningPattern.label}. Jarvis checked the card against the official called numbers.`,
+        `🏆 BINGO verified! ${myName} wins Round ${activeBingoRound.roundId} with ${winningPattern.label}. +${BINGO_WIN_SCORE} score! Jarvis checked the card against the official called numbers.`,
         JARVIS_NAME,
         `bingo-winner-${activeBingoRound.roundId}`,
         'bingo_winner',
@@ -844,10 +902,14 @@ export default function HomePage() {
       );
 
       if (winnerMessage) {
-        triggerTopScoreCelebration({ user_name: myName, total_score: Number(scoreMap.get(myName) || 0) + 1 });
+        const awarded = await awardScoreOnce(myName, `bingo-${activeBingoRound.roundId}`, BINGO_WIN_SCORE);
+        triggerTopScoreCelebration({
+          user_name: myName,
+          total_score: Number(scoreMap.get(myName) || 0) + (awarded ? BINGO_WIN_SCORE : 0)
+        });
       }
 
-      setTemporaryBingoNotice(`Verified BINGO: ${winningPattern.label}!`);
+      setTemporaryBingoNotice(`Verified BINGO: ${winningPattern.label}! +${BINGO_WIN_SCORE} score.`);
       return;
     }
 
@@ -1012,6 +1074,11 @@ export default function HomePage() {
       setMyName(savedName);
       setNameDraft(savedName);
       setSelectedSender(savedName);
+    }
+
+    const savedMarkColor = localStorage.getItem('bingo_mark_color') || 'blue';
+    if (BINGO_MARK_COLORS.some((color) => color.key === savedMarkColor)) {
+      setBingoMarkColor(savedMarkColor);
     }
   }, []);
 
@@ -1213,7 +1280,7 @@ export default function HomePage() {
     }
   }
 
-  async function awardScoreOnce(userName: string, gameEventKey?: string | number | null) {
+  async function awardScoreOnce(userName: string, gameEventKey?: string | number | null, points = 1) {
     const safeName = cleanName(userName);
     if (!safeName || safeName === JARVIS_NAME || safeName === 'System') return false;
 
@@ -1221,7 +1288,7 @@ export default function HomePage() {
       const { data, error } = await supabase.rpc('award_score_once', {
         p_event_key: `score-${String(gameEventKey ?? 'unknown')}`,
         p_user_name: safeName,
-        p_points: 1
+        p_points: points
       });
 
       if (error) {
@@ -1239,7 +1306,7 @@ export default function HomePage() {
           const withoutUser = current.filter((score) => score.user_name !== safeName);
           const updatedScore: UserScore = {
             user_name: safeName,
-            total_score: Number(existing?.total_score || 0) + 1,
+            total_score: Number(existing?.total_score || 0) + points,
             updated_at: new Date().toISOString()
           };
           return sortScores([...withoutUser, updatedScore]).slice(0, 100);
@@ -1604,9 +1671,33 @@ export default function HomePage() {
                   })}
                 </div>
 
+                <div className="bingo-mark-options">
+                  <p className="bingo-section-title">Mark color</p>
+                  <div className="bingo-color-row">
+                    {BINGO_MARK_COLORS.map((color) => (
+                      <button
+                        key={color.key}
+                        type="button"
+                        className={`bingo-color-option ${bingoMarkColor === color.key ? 'active' : ''}`}
+                        style={
+                          {
+                            '--bingo-swatch-fill': color.fill,
+                            '--bingo-swatch-border': color.border
+                          } as CSSProperties
+                        }
+                        aria-pressed={bingoMarkColor === color.key}
+                        onClick={() => changeBingoMarkColor(color.key)}
+                      >
+                        <span aria-hidden="true" />
+                        {color.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {isBingoParticipant && bingoCard ? (
                   <>
-                    <div className="bingo-card">
+                    <div className="bingo-card" style={bingoMarkStyle}>
                       {['B', 'I', 'N', 'G', 'O'].map((letter) => (
                         <div key={letter} className="bingo-card-head">{letter}</div>
                       ))}
@@ -1630,9 +1721,14 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    <button type="button" className="bingo-claim-button" onClick={handleBingoClaim}>
-                      BINGO
-                    </button>
+                    <div className="bingo-action-row">
+                      <button type="button" className="bingo-claim-button" onClick={handleBingoClaim}>
+                        BINGO
+                      </button>
+                      <button type="button" className="bingo-leave-button" onClick={leaveBingoRound}>
+                        Leave Bingo
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <div className="bingo-join-card">
@@ -1751,7 +1847,7 @@ export default function HomePage() {
         </div>
 
         <div className="side-note">
-          <Gamepad2 size={16} /> Jarvis hosts games/trivia, but pauses them automatically while a Bingo round is active.
+          <Gamepad2 size={16} /> Jarvis hosts games/trivia, pauses them while Bingo is active, and gives +50 score to a verified Bingo winner.
         </div>
       </aside>
 
@@ -1773,6 +1869,11 @@ export default function HomePage() {
               </strong>
             </div>
             <div className="sender-pill">Logged in as: <strong>{senderName || 'Name required'}</strong></div>
+            {myName ? (
+              <button type="button" className="logout-button" onClick={logoutChatroom}>
+                Logout
+              </button>
+            ) : null}
           </div>
         </header>
 

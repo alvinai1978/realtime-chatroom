@@ -1461,22 +1461,71 @@ button {
     min-height: 50px;
   }
 }
-/* v13.1 Bingo card mobile visibility fix */
-.bingo-drawer {
-  overflow-y: auto;
-  padding-bottom: 22px;
+
+
+/* v13.2 Bingo score, leave, logout, and mark color controls */
+.logout-button {
+  border: 0;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.logout-button:hover {
+  background: #fecaca;
+}
+
+.bingo-mark-options {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel-soft);
+  padding: 12px;
+}
+
+.bingo-color-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bingo-color-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #d6deea;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  padding: 7px 9px;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.bingo-color-option span {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--bingo-swatch-fill);
+  border: 2px solid var(--bingo-swatch-border);
+}
+
+.bingo-color-option.active {
+  border-color: var(--primary);
+  background: #eef6ff;
+  color: var(--primary-dark);
+  box-shadow: 0 0 0 3px rgba(10, 124, 255, 0.10);
 }
 
 .bingo-card {
-  display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-auto-rows: 54px;
+  grid-template-rows: 38px repeat(5, 54px);
   flex: 0 0 auto;
   width: 100%;
-  overflow: visible;
-  border: 1px solid #0f172a;
-  border-radius: 20px;
-  background: white;
+  overflow: hidden;
 }
 
 .bingo-card-head {
@@ -1484,6 +1533,7 @@ button {
   height: 38px;
   display: grid;
   place-items: center;
+  padding: 0;
 }
 
 .bingo-cell {
@@ -1491,34 +1541,50 @@ button {
   min-width: 0;
   min-height: 54px;
   height: 54px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #d6deea;
-  background: white;
-  color: #111827;
-  font-weight: 950;
   appearance: none;
 }
 
-.bingo-cell span {
-  position: relative;
-  z-index: 2;
-}
-
 .bingo-cell.marked::after {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  z-index: 1;
-  border-radius: 999px;
-  background: rgba(10, 124, 255, 0.34);
-  border: 2px solid rgba(10, 124, 255, 0.65);
+  background: var(--bingo-mark-fill, rgba(10, 124, 255, 0.34));
+  border-color: var(--bingo-mark-border, rgba(10, 124, 255, 0.65));
 }
 
-.bingo-claim-button {
-  position: static;
-  flex: 0 0 auto;
-  margin-top: 10px;
+.bingo-cell.free::after {
+  background: rgba(5, 150, 105, 0.22);
+  border-color: rgba(5, 150, 105, 0.45);
+}
+
+.bingo-action-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.bingo-leave-button {
+  min-height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fff1f2;
+  color: #be123c;
+  padding: 0 14px;
+  font-weight: 1000;
+  white-space: nowrap;
+}
+
+.bingo-join-card button:disabled,
+.bingo-empty button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 900px) {
+  .logout-button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1528,7 +1594,7 @@ button {
   }
 
   .bingo-card {
-    grid-auto-rows: 46px;
+    grid-template-rows: 34px repeat(5, 46px);
   }
 
   .bingo-card-head {
@@ -1548,8 +1614,21 @@ button {
     padding: 8px;
   }
 
-  .bingo-pattern-card small {
-    display: block;
-    font-size: 0.76rem;
+  .bingo-action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bingo-leave-button {
+    min-height: 44px;
+  }
+
+  .bingo-color-option {
+    flex: 1 1 88px;
+    justify-content: center;
+  }
+
+  .topbar-actions .logout-button {
+    flex-basis: 100%;
+    width: 100%;
   }
 }

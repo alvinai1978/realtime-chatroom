@@ -1,8 +1,8 @@
-# Realtime Chatroom Jarvis v13
+# Realtime Chatroom Jarvis v13.2
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, at NVIDIA AI.
 
-## New in v13
+## New in v13.2
 
 - Mas compatible sa cellphone at tablet.
 - Mas malaking visible chat area para mas maraming messages ang kita.
@@ -14,6 +14,10 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - Added Jarvis-hosted Bingo mode with auto-hidden side card drawer.
 - Bingo pauses Jarvis trivia and question games while active.
 - Jarvis announces 3 winning patterns, calls 75-ball Bingo numbers, and verifies BINGO claims.
+- Verified Bingo winner gets +50 score automatically.
+- Added Leave Bingo button for users who want to exit the current Bingo card.
+- Added Chatroom Logout button to clear the current participant session.
+- Added Bingo mark color options with translucent marks so card numbers remain visible.
 
 ## Features
 
@@ -26,7 +30,7 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - User score system with all-time top score.
 - Confetti celebration for top scorer.
 - Join and left notifications.
-- Optional Bingo participation with generated B-I-N-G-O cards, translucent marks, called-number board, and BINGO claim verification.
+- Optional Bingo participation with generated B-I-N-G-O cards, translucent custom-color marks, called-number board, Leave Bingo, and BINGO claim verification.
 
 ## Supabase
 
