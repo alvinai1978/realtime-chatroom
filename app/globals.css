@@ -1461,3 +1461,95 @@ button {
     min-height: 50px;
   }
 }
+/* v13.1 Bingo card mobile visibility fix */
+.bingo-drawer {
+  overflow-y: auto;
+  padding-bottom: 22px;
+}
+
+.bingo-card {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: 54px;
+  flex: 0 0 auto;
+  width: 100%;
+  overflow: visible;
+  border: 1px solid #0f172a;
+  border-radius: 20px;
+  background: white;
+}
+
+.bingo-card-head {
+  min-height: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+}
+
+.bingo-cell {
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d6deea;
+  background: white;
+  color: #111827;
+  font-weight: 950;
+  appearance: none;
+}
+
+.bingo-cell span {
+  position: relative;
+  z-index: 2;
+}
+
+.bingo-cell.marked::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: 1;
+  border-radius: 999px;
+  background: rgba(10, 124, 255, 0.34);
+  border: 2px solid rgba(10, 124, 255, 0.65);
+}
+
+.bingo-claim-button {
+  position: static;
+  flex: 0 0 auto;
+  margin-top: 10px;
+}
+
+@media (max-width: 560px) {
+  .bingo-drawer {
+    max-height: 88dvh;
+    padding-bottom: 18px;
+  }
+
+  .bingo-card {
+    grid-auto-rows: 46px;
+  }
+
+  .bingo-card-head {
+    min-height: 34px;
+    height: 34px;
+    font-size: 0.95rem;
+  }
+
+  .bingo-cell {
+    min-height: 46px;
+    height: 46px;
+    font-size: 0.9rem;
+  }
+
+  .bingo-pattern-card {
+    grid-template-columns: 52px 1fr;
+    padding: 8px;
+  }
+
+  .bingo-pattern-card small {
+    display: block;
+    font-size: 0.76rem;
+  }
+}
