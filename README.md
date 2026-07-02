@@ -1,8 +1,8 @@
-# Realtime Chatroom Jarvis v12
+# Realtime Chatroom Jarvis v13
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, at NVIDIA AI.
 
-## New in v12
+## New in v13
 
 - Mas compatible sa cellphone at tablet.
 - Mas malaking visible chat area para mas maraming messages ang kita.
@@ -11,6 +11,9 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - Hindi na paulit-ulit agad ang game questions ni Jarvis.
 - Mas marami nang question bank si Jarvis.
 - Fixed duplicate Jarvis AI reply issue.
+- Added Jarvis-hosted Bingo mode with auto-hidden side card drawer.
+- Bingo pauses Jarvis trivia and question games while active.
+- Jarvis announces 3 winning patterns, calls 75-ball Bingo numbers, and verifies BINGO claims.
 
 ## Features
 
@@ -23,6 +26,7 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - User score system with all-time top score.
 - Confetti celebration for top scorer.
 - Join and left notifications.
+- Optional Bingo participation with generated B-I-N-G-O cards, translucent marks, called-number board, and BINGO claim verification.
 
 ## Supabase
 
