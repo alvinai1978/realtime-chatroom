@@ -71,6 +71,7 @@ type ActiveBingoRound = {
   roundId: string;
   patterns: BingoPattern[];
   startedAt: string;
+  eligiblePlayers: string[];
 };
 
 type BingoCell = [number, number];
@@ -420,6 +421,30 @@ function parseBingoPatternList(content: string) {
     .filter(Boolean) as BingoPattern[];
 }
 
+function normalizeBingoPlayerName(name: string) {
+  return cleanName(name).toLowerCase();
+}
+
+function parseBingoEligiblePlayers(content: string) {
+  const match = content.match(/\[ELIGIBLE:\s*([^\]]*)\]/i);
+  if (!match) return [];
+
+  return match[1]
+    .split('|')
+    .map((item) => cleanName(item))
+    .filter((name) => name && name !== 'Guest');
+}
+
+function isBingoEligiblePlayer(round: ActiveBingoRound | null, userName: string) {
+  if (!round || !userName) return false;
+
+  // Backward-compatible: older Bingo start messages had no eligible-player lock.
+  if (!round.eligiblePlayers.length) return true;
+
+  const normalizedUserName = normalizeBingoPlayerName(userName);
+  return round.eligiblePlayers.some((player) => normalizeBingoPlayerName(player) === normalizedUserName);
+}
+
 function getActiveBingoRound(currentMessages: Message[]): ActiveBingoRound | null {
   const latestStart = [...currentMessages]
     .reverse()
@@ -445,7 +470,8 @@ function getActiveBingoRound(currentMessages: Message[]): ActiveBingoRound | nul
   return {
     roundId,
     patterns: parsedPatterns.length === 3 ? parsedPatterns : pickBingoPatterns(roundId),
-    startedAt: latestStart.created_at
+    startedAt: latestStart.created_at,
+    eligiblePlayers: parseBingoEligiblePlayers(latestStart.content)
   };
 }
 
@@ -627,6 +653,11 @@ export default function HomePage() {
     return getBingoCallOrder(activeBingoRound.roundId)[bingoCalledNumbers.length] || null;
   }, [activeBingoRound?.roundId, bingoCalledNumbers.length]);
 
+  const canJoinActiveBingo = useMemo(
+    () => Boolean(activeBingoRound && myName && isBingoEligiblePlayer(activeBingoRound, myName)),
+    [activeBingoRound?.roundId, activeBingoRound?.eligiblePlayers.join('|'), myName]
+  );
+
   function getTakenParticipantNames(currentName = myName) {
     const takenNames = new Set<string>();
 
@@ -695,6 +726,12 @@ export default function HomePage() {
       return;
     }
 
+    if (!isBingoEligiblePlayer(activeBingoRound, myName)) {
+      setIsBingoOpen(true);
+      setTemporaryBingoNotice('Late join ka na sa Bingo. Hintayin muna matapos ang current round bago sumali.');
+      return;
+    }
+
     localStorage.setItem(`bingo_joined_${activeBingoRound.roundId}_${myName}`, '1');
     setIsBingoParticipant(true);
     setIsBingoOpen(true);
@@ -732,9 +769,17 @@ export default function HomePage() {
     const roundId = makeRoundId();
     const patterns = pickBingoPatterns(roundId);
     const patternText = patterns.map((pattern) => pattern.label).join(', ');
+    const eligiblePlayers = Array.from(
+      new Set(
+        userList
+          .map((user) => cleanName(user.name))
+          .filter((name) => name && name !== JARVIS_NAME && name !== 'System')
+      )
+    ).sort((a, b) => a.localeCompare(b));
+    const eligibleText = eligiblePlayers.length ? eligiblePlayers.join(' | ') : cleanName(myName);
 
     await insertUniqueEvent(
-      `🎱 Jarvis Bingo started! Round ${roundId}. Patterns to win: ${patternText}. Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active.`,
+      `🎱 Jarvis Bingo started! Round ${roundId}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}]`,
       JARVIS_NAME,
       `bingo-start-${roundId}`,
       'bingo_start',
@@ -742,7 +787,7 @@ export default function HomePage() {
     );
 
     setIsBingoOpen(true);
-    setTemporaryBingoNotice('Bingo round started. Join ka na para makakuha ng card.');
+    setTemporaryBingoNotice('Bingo round started. Online users ngayon lang ang puwedeng sumali.');
   }
 
   async function postNextBingoCall() {
@@ -776,6 +821,11 @@ export default function HomePage() {
 
   async function handleBingoClaim() {
     if (!activeBingoRound || !bingoCard || !myName) return;
+
+    if (!isBingoEligiblePlayer(activeBingoRound, myName)) {
+      setTemporaryBingoNotice('Late join ka sa round na ito. Hindi puwedeng mag-claim hanggang next Bingo session.');
+      return;
+    }
 
     if (!isBingoParticipant) {
       setTemporaryBingoNotice('Join Bingo muna bago mag-claim.');
@@ -893,6 +943,12 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!activeBingoRound || !myName) {
+      setIsBingoParticipant(false);
+      setBingoMarkedNumbers([]);
+      return;
+    }
+
+    if (!isBingoEligiblePlayer(activeBingoRound, myName)) {
       setIsBingoParticipant(false);
       setBingoMarkedNumbers([]);
       return;
@@ -1580,8 +1636,17 @@ export default function HomePage() {
                   </>
                 ) : (
                   <div className="bingo-join-card">
-                    <p>Gusto mong sumali? Jarvis will generate your own B-I-N-G-O card for this round.</p>
-                    <button type="button" onClick={joinBingoRound}>Join Bingo</button>
+                    {canJoinActiveBingo ? (
+                      <>
+                        <p>Gusto mong sumali? Jarvis will generate your own B-I-N-G-O card for this round.</p>
+                        <button type="button" onClick={joinBingoRound}>Join Bingo</button>
+                      </>
+                    ) : (
+                      <>
+                        <p>Locked na ang Bingo session. Late join ka na, kaya hintayin muna matapos ang current round.</p>
+                        <button type="button" disabled>Wait for next round</button>
+                      </>
+                    )}
                   </div>
                 )}
 
