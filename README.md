@@ -1,8 +1,8 @@
-# Realtime Chatroom Jarvis v14
+# Realtime Chatroom Jarvis v14.5
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, at Jarvis-hosted Bingo.
 
-## New in v14
+## New in v14.5
 
 - Full Ripple-only Admin Control Panel.
 - Admin buttons: Start Bingo, End Bingo, Reset Calls, Reset Scores display, Kick User, Mute/Unmute User, Clear Chat, and View Winners.
@@ -24,6 +24,13 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - Round countdown animation before Bingo starts.
 - Animated Bingo number draw machine on BingoTV.
 - User Profile + Avatar + profile color.
+
+- Player multi-card options:
+  - users can choose 1 to 4 Bingo cards maximum
+  - mobile layout shows 2 cards per row for a compact view
+  - users can use random cards, same-card mode, or choose a preferred card family
+  - card layouts can be changed before the first Bingo call only to prevent cheating
+- More colorful B-I-N-G-O card headers per column.
 
 ## Admin Login
 
@@ -71,7 +78,7 @@ http://localhost:3000
 
 ```bash
 git add app/page.tsx app/globals.css README.md
-git commit -m "Add full Bingo admin features"
+git commit -m "Add player multi card Bingo options"
 git push
 vercel --prod
 ```

@@ -82,6 +82,7 @@ type ActiveBingoRound = {
 };
 
 type BingoCell = [number, number];
+type BingoCardMode = 'random' | 'same' | 'choose';
 
 
 const ROOM_NAME = 'main-room';
@@ -97,6 +98,22 @@ const BINGO_DEFAULT_PRIZE = 'Bingo Champion';
 const BINGO_SPEED_OPTIONS = [5000, 8000, 10000] as const;
 const BINGO_WINNER_LIMIT_OPTIONS = [1, 2, 3] as const;
 const BINGO_PATTERN_COUNT_OPTIONS = [1, 2, 3] as const;
+const BINGO_CARD_COUNT_OPTIONS = [1, 2, 3, 4] as const;
+const BINGO_CARD_MODES: Array<{ key: BingoCardMode; label: string; description: string }> = [
+  { key: 'random', label: 'Random cards', description: 'Generate fresh different cards.' },
+  { key: 'same', label: 'Same card', description: 'Use the same card layout for every card.' },
+  { key: 'choose', label: 'Choose card', description: 'Pick a preferred card family.' }
+];
+const BINGO_CARD_CHOICES = [
+  { key: 'lucky-a', label: 'Lucky Card A' },
+  { key: 'lucky-b', label: 'Lucky Card B' },
+  { key: 'lucky-c', label: 'Lucky Card C' },
+  { key: 'lucky-d', label: 'Lucky Card D' },
+  { key: 'star', label: 'Star Card' },
+  { key: 'dragon', label: 'Dragon Card' },
+  { key: 'rainbow', label: 'Rainbow Card' },
+  { key: 'classic', label: 'Classic Card' }
+] as const;
 const BINGO_COUNTDOWN_SECONDS = 5;
 const BINGO_MARK_COLORS = [
   { key: 'blue', label: 'Blue', fill: 'rgba(10, 124, 255, 0.34)', border: 'rgba(10, 124, 255, 0.65)' },
@@ -792,6 +809,37 @@ function generateBingoCard(seedText: string): BingoCellValue[][] {
   return card;
 }
 
+
+function getBingoCardSeed(roundId: string, userName: string, cardIndex: number, mode: BingoCardMode, choice: string, seed: string) {
+  const cleanUser = eventSafeSlug(userName || 'player');
+  const cleanChoice = eventSafeSlug(choice || 'lucky-a');
+  const cleanSeed = eventSafeSlug(seed || 'default');
+
+  if (mode === 'same') {
+    return `${roundId}:${cleanUser}:same-card:${cleanChoice}:${cleanSeed}`;
+  }
+
+  if (mode === 'choose') {
+    return `${roundId}:${cleanUser}:chosen-card:${cleanChoice}:card-${cardIndex + 1}:${cleanSeed}`;
+  }
+
+  return `${roundId}:${cleanUser}:random-card-${cardIndex + 1}:${cleanSeed}`;
+}
+
+function generatePlayerBingoCards(
+  roundId: string,
+  userName: string,
+  cardCount: number,
+  mode: BingoCardMode,
+  choice: string,
+  seed: string
+) {
+  const safeCount = Math.max(1, Math.min(4, Number(cardCount) || 1));
+  return Array.from({ length: safeCount }, (_, cardIndex) =>
+    generateBingoCard(getBingoCardSeed(roundId, userName, cardIndex, mode, choice, seed))
+  );
+}
+
 function uniqueCells(cells: BingoCell[]) {
   const seen = new Set<string>();
   return cells.filter(([row, column]) => {
@@ -909,6 +957,11 @@ export default function HomePage() {
   const [bingoMarkedNumbers, setBingoMarkedNumbers] = useState<number[]>([]);
   const [bingoNotice, setBingoNotice] = useState('');
   const [bingoMarkColor, setBingoMarkColor] = useState('blue');
+  const [bingoCardCount, setBingoCardCount] = useState<number>(1);
+  const [bingoCardMode, setBingoCardMode] = useState<BingoCardMode>('random');
+  const [bingoCardChoice, setBingoCardChoice] = useState('lucky-a');
+  const [bingoCardSeed, setBingoCardSeed] = useState('default');
+  const [bingoCardNotice, setBingoCardNotice] = useState('');
   const [bingoCallSpeedMs, setBingoCallSpeedMs] = useState<number>(BINGO_CALL_INTERVAL_MS);
   const [bingoWinnerLimit, setBingoWinnerLimit] = useState<number>(1);
   const [bingoPatternCount, setBingoPatternCount] = useState<number>(3);
@@ -975,10 +1028,22 @@ export default function HomePage() {
   );
   const bingoCalledSet = useMemo(() => new Set(bingoCalledNumbers), [bingoCalledNumbers]);
   const bingoMarkedSet = useMemo(() => new Set(bingoMarkedNumbers), [bingoMarkedNumbers]);
-  const bingoCard = useMemo(
-    () => (myName && activeBingoRound ? generateBingoCard(`${activeBingoRound.roundId}:${myName}`) : null),
-    [activeBingoRound?.roundId, myName]
+  const bingoCards = useMemo(
+    () =>
+      myName && activeBingoRound
+        ? generatePlayerBingoCards(
+            activeBingoRound.roundId,
+            myName,
+            bingoCardCount,
+            bingoCardMode,
+            bingoCardChoice,
+            bingoCardSeed
+          )
+        : [],
+    [activeBingoRound?.roundId, myName, bingoCardCount, bingoCardMode, bingoCardChoice, bingoCardSeed]
   );
+  const bingoCard = bingoCards[0] || null;
+  const canEditBingoCards = Boolean(activeBingoRound && (!isBingoParticipant || bingoCalledNumbers.length === 0));
   const latestBingoCall = bingoCalledNumbers.length ? bingoCalledNumbers[bingoCalledNumbers.length - 1] : null;
   const nextBingoCallNumber = useMemo(() => {
     if (!activeBingoRound) return null;
@@ -1262,6 +1327,64 @@ export default function HomePage() {
     localStorage.setItem('bingo_mark_color', colorKey);
   }
 
+  function clearCurrentBingoMarks() {
+    if (activeBingoRound && myName) {
+      localStorage.removeItem(`bingo_marks_${activeBingoRound.roundId}_${myName}`);
+    }
+    setBingoMarkedNumbers([]);
+  }
+
+  function changeBingoCardCount(value: string) {
+    const nextCount = Number(value);
+    if (!BINGO_CARD_COUNT_OPTIONS.includes(nextCount as (typeof BINGO_CARD_COUNT_OPTIONS)[number])) return;
+    if (!canEditBingoCards) {
+      setBingoCardNotice('Card settings are locked after the first Bingo call.');
+      return;
+    }
+    setBingoCardCount(nextCount);
+    localStorage.setItem('bingo_card_count', String(nextCount));
+    clearCurrentBingoMarks();
+    setBingoCardNotice(`${nextCount} Bingo card${nextCount > 1 ? 's' : ''} ready.`);
+  }
+
+  function changeBingoCardMode(value: string) {
+    if (!BINGO_CARD_MODES.some((mode) => mode.key === value)) return;
+    if (!canEditBingoCards) {
+      setBingoCardNotice('Card settings are locked after the first Bingo call.');
+      return;
+    }
+    const nextMode = value as BingoCardMode;
+    setBingoCardMode(nextMode);
+    localStorage.setItem('bingo_card_mode', nextMode);
+    clearCurrentBingoMarks();
+    setBingoCardNotice(nextMode === 'same' ? 'Same card mode enabled.' : nextMode === 'choose' ? 'Choose card mode enabled.' : 'Random cards enabled.');
+  }
+
+  function changeBingoCardChoice(value: string) {
+    if (!BINGO_CARD_CHOICES.some((choice) => choice.key === value)) return;
+    if (!canEditBingoCards) {
+      setBingoCardNotice('Card settings are locked after the first Bingo call.');
+      return;
+    }
+    setBingoCardChoice(value);
+    localStorage.setItem('bingo_card_choice', value);
+    clearCurrentBingoMarks();
+    setBingoCardNotice('Selected card family updated.');
+  }
+
+  function rerollBingoCards() {
+    if (!canEditBingoCards || !activeBingoRound || !myName) {
+      setBingoCardNotice('Cards can only be changed before the first Bingo call.');
+      return;
+    }
+    const nextSeed = `${Date.now()}-${Math.floor(Math.random() * 99999)}`;
+    setBingoCardSeed(nextSeed);
+    localStorage.setItem('bingo_card_seed', nextSeed);
+    localStorage.setItem(`bingo_card_seed_${activeBingoRound.roundId}_${myName}`, nextSeed);
+    clearCurrentBingoMarks();
+    setBingoCardNotice('New Bingo card layout generated.');
+  }
+
   function changeBingoCallSpeed(value: string) {
     const nextSpeed = Number(value);
     if (!BINGO_SPEED_OPTIONS.includes(nextSpeed as (typeof BINGO_SPEED_OPTIONS)[number])) return;
@@ -1399,6 +1522,7 @@ export default function HomePage() {
 
     localStorage.removeItem(`bingo_joined_${activeBingoRound.roundId}_${myName}`);
     localStorage.removeItem(`bingo_marks_${activeBingoRound.roundId}_${myName}`);
+    localStorage.removeItem(`bingo_card_seed_${activeBingoRound.roundId}_${myName}`);
     setIsBingoParticipant(false);
     setBingoMarkedNumbers([]);
     setTemporaryBingoNotice('Umalis ka sa Bingo. Pwede kang sumali ulit habang eligible pa ang round.');
@@ -1410,6 +1534,7 @@ export default function HomePage() {
     if (activeBingoRound && currentName) {
       localStorage.removeItem(`bingo_joined_${activeBingoRound.roundId}_${currentName}`);
       localStorage.removeItem(`bingo_marks_${activeBingoRound.roundId}_${currentName}`);
+      localStorage.removeItem(`bingo_card_seed_${activeBingoRound.roundId}_${currentName}`);
     }
 
     channelRef.current?.untrack();
@@ -1447,9 +1572,14 @@ export default function HomePage() {
     }
 
     enableBingoSounds();
+    const savedRoundSeed = localStorage.getItem(`bingo_card_seed_${activeBingoRound.roundId}_${myName}`);
+    const activeSeed = savedRoundSeed || bingoCardSeed || `${Date.now()}-${Math.floor(Math.random() * 99999)}`;
+    setBingoCardSeed(activeSeed);
+    localStorage.setItem('bingo_card_seed', activeSeed);
+    localStorage.setItem(`bingo_card_seed_${activeBingoRound.roundId}_${myName}`, activeSeed);
     localStorage.setItem(`bingo_joined_${activeBingoRound.roundId}_${myName}`, '1');
     void insertUniqueEvent(
-      `🎟️ ${myName} joined Bingo Round ${activeBingoRound.roundId}. [TARGET: ${myName}]`,
+      `🎟️ ${myName} joined Bingo Round ${activeBingoRound.roundId}. Cards: ${bingoCardCount}. Mode: ${bingoCardMode}. Choice: ${bingoCardChoice}. [TARGET: ${myName}] [CARDS: count=${bingoCardCount}|mode=${bingoCardMode}|choice=${bingoCardChoice}|seed=${activeSeed}]`,
       'System',
       `bingo-join-${activeBingoRound.roundId}-${eventSafeSlug(myName)}`,
       'bingo_join',
@@ -1457,7 +1587,7 @@ export default function HomePage() {
     );
     setIsBingoParticipant(true);
     setIsBingoOpen(true);
-    setTemporaryBingoNotice('Bingo card ready. Markahan lang ang mga number na tinawag ni Jarvis.');
+    setTemporaryBingoNotice(`${bingoCardCount} Bingo card${bingoCardCount > 1 ? 's' : ''} ready. Markahan lang ang mga number na tinawag ni Jarvis.`);
   }
 
   function toggleBingoMark(value: BingoCellValue) {
@@ -1663,7 +1793,7 @@ export default function HomePage() {
   }
 
   async function handleBingoClaim() {
-    if (!activeBingoRound || !bingoCard || !myName) return;
+    if (!activeBingoRound || !bingoCards.length || !myName) return;
 
     if (!isBingoEligiblePlayer(activeBingoRound, myName)) {
       setTemporaryBingoNotice('Late join ka sa round na ito. Hindi puwedeng mag-claim hanggang next Bingo session.');
@@ -1688,12 +1818,15 @@ export default function HomePage() {
       return;
     }
 
-    const winningPattern = verifyBingoCard(bingoCard, bingoCalledSet, activeBingoRound.patterns);
+    const winningResult = bingoCards
+      .map((card, index) => ({ card, cardIndex: index, pattern: verifyBingoCard(card, bingoCalledSet, activeBingoRound.patterns) }))
+      .find((result) => result.pattern);
+    const winningPattern = winningResult?.pattern || null;
 
-    if (winningPattern) {
+    if (winningPattern && winningResult) {
       const winnerNumber = currentWinnerMessages.length + 1;
       const winnerMessage = await insertUniqueEvent(
-        `🏆 BINGO verified! Winner #${winnerNumber}: ${myName} wins Round ${activeBingoRound.roundId} with ${winningPattern.label}. Prize: ${activeBingoRound.prizeLabel}. +${BINGO_WIN_SCORE} score! Jarvis checked the card against the official called numbers.`,
+        `🏆 BINGO verified! Winner #${winnerNumber}: ${myName} wins Round ${activeBingoRound.roundId} with ${winningPattern.label} on Card #${winningResult.cardIndex + 1}. Prize: ${activeBingoRound.prizeLabel}. +${BINGO_WIN_SCORE} score! Jarvis checked the card against the official called numbers.`,
         JARVIS_NAME,
         `bingo-winner-${activeBingoRound.roundId}-${eventSafeSlug(myName)}`,
         'bingo_winner',
@@ -1719,7 +1852,7 @@ export default function HomePage() {
         }
       }
 
-      setTemporaryBingoNotice(`Verified BINGO: ${winningPattern.label}! +${BINGO_WIN_SCORE} score.`);
+      setTemporaryBingoNotice(`Verified BINGO: ${winningPattern.label} on Card #${winningResult.cardIndex + 1}! +${BINGO_WIN_SCORE} score.`);
       return;
     }
 
@@ -1841,6 +1974,18 @@ export default function HomePage() {
     }
   }, [activeBingoRound?.roundId, myName]);
 
+  useEffect(() => {
+    if (!activeBingoRound || !myName) return;
+    const roundSeedKey = `bingo_card_seed_${activeBingoRound.roundId}_${myName}`;
+    const savedRoundSeed = localStorage.getItem(roundSeedKey);
+    if (savedRoundSeed) {
+      setBingoCardSeed(savedRoundSeed);
+      return;
+    }
+    const savedGlobalSeed = localStorage.getItem('bingo_card_seed') || 'default';
+    setBingoCardSeed(savedGlobalSeed);
+  }, [activeBingoRound?.roundId, myName]);
+
   async function loadScores() {
     const { data, error } = await supabase
       .from('user_scores')
@@ -1907,6 +2052,24 @@ export default function HomePage() {
     if (BINGO_MARK_COLORS.some((color) => color.key === savedMarkColor)) {
       setBingoMarkColor(savedMarkColor);
     }
+
+    const savedCardCount = Number(localStorage.getItem('bingo_card_count') || 1);
+    if (BINGO_CARD_COUNT_OPTIONS.includes(savedCardCount as (typeof BINGO_CARD_COUNT_OPTIONS)[number])) {
+      setBingoCardCount(savedCardCount);
+    }
+
+    const savedCardMode = localStorage.getItem('bingo_card_mode') || 'random';
+    if (BINGO_CARD_MODES.some((mode) => mode.key === savedCardMode)) {
+      setBingoCardMode(savedCardMode as BingoCardMode);
+    }
+
+    const savedCardChoice = localStorage.getItem('bingo_card_choice') || 'lucky-a';
+    if (BINGO_CARD_CHOICES.some((choice) => choice.key === savedCardChoice)) {
+      setBingoCardChoice(savedCardChoice);
+    }
+
+    const savedCardSeed = localStorage.getItem('bingo_card_seed') || 'default';
+    setBingoCardSeed(savedCardSeed);
 
     const savedCallSpeed = Number(localStorage.getItem('bingo_call_speed_ms') || BINGO_CALL_INTERVAL_MS);
     if (BINGO_SPEED_OPTIONS.includes(savedCallSpeed as (typeof BINGO_SPEED_OPTIONS)[number])) {
@@ -3070,6 +3233,43 @@ export default function HomePage() {
                   })}
                 </div>
 
+                <div className="bingo-card-options">
+                  <p className="bingo-section-title">Card options</p>
+                  <div className="bingo-card-option-grid">
+                    <label>
+                      <span>Cards</span>
+                      <select value={bingoCardCount} onChange={(event) => changeBingoCardCount(event.target.value)} disabled={!canEditBingoCards}>
+                        {BINGO_CARD_COUNT_OPTIONS.map((count) => (
+                          <option key={count} value={count}>{count} card{count > 1 ? 's' : ''}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Card type</span>
+                      <select value={bingoCardMode} onChange={(event) => changeBingoCardMode(event.target.value)} disabled={!canEditBingoCards}>
+                        {BINGO_CARD_MODES.map((mode) => (
+                          <option key={mode.key} value={mode.key}>{mode.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    {bingoCardMode === 'choose' ? (
+                      <label>
+                        <span>Choose card</span>
+                        <select value={bingoCardChoice} onChange={(event) => changeBingoCardChoice(event.target.value)} disabled={!canEditBingoCards}>
+                          {BINGO_CARD_CHOICES.map((choice) => (
+                            <option key={choice.key} value={choice.key}>{choice.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <button type="button" onClick={rerollBingoCards} disabled={!canEditBingoCards}>
+                      <RotateCcw size={14} /> Change cards
+                    </button>
+                  </div>
+                  <small>{canEditBingoCards ? 'You can change cards before the first Bingo call. Maximum 4 cards.' : 'Cards are locked after the first Bingo call to prevent cheating.'}</small>
+                  {bingoCardNotice ? <em>{bingoCardNotice}</em> : null}
+                </div>
+
                 <div className="bingo-mark-options">
                   <p className="bingo-section-title">Mark color</p>
                   <div className="bingo-color-row">
@@ -3094,30 +3294,37 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {isBingoParticipant && bingoCard ? (
+                {isBingoParticipant && bingoCards.length ? (
                   <>
-                    <div className="bingo-card" style={bingoMarkStyle}>
-                      {['B', 'I', 'N', 'G', 'O'].map((letter) => (
-                        <div key={letter} className="bingo-card-head">{letter}</div>
-                      ))}
-                      {bingoCard.flatMap((row, rowIndex) =>
-                        row.map((value, columnIndex) => {
-                          const isFree = value === 'FREE';
-                          const isCalled = typeof value === 'number' && bingoCalledSet.has(value);
-                          const isMarked = isFree || (typeof value === 'number' && bingoMarkedSet.has(value));
+                    <div className={`bingo-card-stack cards-${bingoCards.length}`} style={bingoMarkStyle}>
+                      {bingoCards.map((card, cardIndex) => (
+                        <div key={`player-card-${cardIndex}`} className="bingo-card-wrap">
+                          <div className="bingo-card-title">Card #{cardIndex + 1}</div>
+                          <div className="bingo-card">
+                            {['B', 'I', 'N', 'G', 'O'].map((letter) => (
+                              <div key={`${cardIndex}-${letter}`} className={`bingo-card-head ${letter.toLowerCase()}`}>{letter}</div>
+                            ))}
+                            {card.flatMap((row, rowIndex) =>
+                              row.map((value, columnIndex) => {
+                                const isFree = value === 'FREE';
+                                const isCalled = typeof value === 'number' && bingoCalledSet.has(value);
+                                const isMarked = isFree || (typeof value === 'number' && bingoMarkedSet.has(value));
 
-                          return (
-                            <button
-                              key={`${rowIndex}-${columnIndex}`}
-                              type="button"
-                              className={`bingo-cell ${isFree ? 'free' : ''} ${isCalled ? 'called' : ''} ${isMarked ? 'marked' : ''}`}
-                              onClick={() => toggleBingoMark(value)}
-                            >
-                              <span>{value}</span>
-                            </button>
-                          );
-                        })
-                      )}
+                                return (
+                                  <button
+                                    key={`${cardIndex}-${rowIndex}-${columnIndex}`}
+                                    type="button"
+                                    className={`bingo-cell ${isFree ? 'free' : ''} ${isCalled ? 'called' : ''} ${isMarked ? 'marked' : ''}`}
+                                    onClick={() => toggleBingoMark(value)}
+                                  >
+                                    <span>{value}</span>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
 
                     <div className="bingo-action-row">
@@ -3133,7 +3340,7 @@ export default function HomePage() {
                   <div className="bingo-join-card">
                     {canJoinActiveBingo ? (
                       <>
-                        <p>Gusto mong sumali? Jarvis will generate your own B-I-N-G-O card for this round.</p>
+                        <p>Gusto mong sumali? Piliin kung ilan ang cards mo, then Jarvis will generate up to 4 B-I-N-G-O cards for this round.</p>
                         <button type="button" onClick={joinBingoRound}>Join Bingo</button>
                       </>
                     ) : (
