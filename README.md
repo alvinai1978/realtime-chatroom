@@ -129,3 +129,11 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - Bingo call event keys are now deterministic per round and call index, so duplicate calls are skipped by the existing unique event protection.
 - The called numbers display now removes duplicate numbers from older rounds/messages while preserving the official call order.
 - BingoTV wording was clarified: Latest Call was renamed into clearer labels such as Current Drawn Number, Recent Called Numbers, and Call Count.
+
+## v14.8 Center Star + Admin Pattern Selection
+
+- The center Bingo card square now displays a star symbol: `★` instead of the word `FREE`.
+- Ripple can choose the exact winning patterns before starting an admin Bingo round.
+- If Ripple leaves the pattern picker empty, Jarvis randomly chooses the required number of patterns.
+- Added 10 more pattern options: Top Row, Middle Row, Bottom Row, Left Column, Center Column, Right Column, Letter V, Letter N, Letter U, and Letter Z.
+- Player/requested Jarvis community rounds can still auto-pick patterns when no admin selection is used.

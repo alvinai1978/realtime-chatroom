@@ -61,7 +61,17 @@ type BingoPatternKey =
   | 'cross'
   | 'diamond'
   | 'picture_frame'
-  | 'blackout';
+  | 'blackout'
+  | 'top_row'
+  | 'middle_row'
+  | 'bottom_row'
+  | 'left_column'
+  | 'center_column'
+  | 'right_column'
+  | 'letter_v'
+  | 'letter_n'
+  | 'letter_u'
+  | 'letter_z';
 
 type BingoPattern = {
   key: BingoPatternKey;
@@ -144,14 +154,24 @@ const BINGO_COLUMNS = [
 const BINGO_PATTERN_POOL: BingoPattern[] = [
   { key: 'straight_line', label: 'Straight Line', description: 'Any full horizontal, vertical, or diagonal line.' },
   { key: 'four_corners', label: 'Four Corners', description: 'Top-left, top-right, bottom-left, and bottom-right.' },
-  { key: 'letter_x', label: 'Letter X', description: 'Both diagonals crossing through the FREE space.' },
+  { key: 'letter_x', label: 'Letter X', description: 'Both diagonals crossing through the center ★.' },
   { key: 'letter_t', label: 'Letter T', description: 'Full top row plus the middle column.' },
   { key: 'letter_l', label: 'Letter L', description: 'Full left column plus the full bottom row.' },
   { key: 'letter_h', label: 'Letter H', description: 'Left column, right column, and the middle row.' },
   { key: 'cross', label: 'Cross / Plus', description: 'Middle row plus middle column.' },
-  { key: 'diamond', label: 'Diamond', description: 'Diamond shape around the FREE center.' },
+  { key: 'diamond', label: 'Diamond', description: 'Diamond shape around the center ★.' },
   { key: 'picture_frame', label: 'Picture Frame', description: 'Complete outside border of the card.' },
-  { key: 'blackout', label: 'Blackout', description: 'All card squares covered. FREE is automatic.' }
+  { key: 'blackout', label: 'Blackout', description: 'All card squares covered. Center ★ is automatic.' },
+  { key: 'top_row', label: 'Top Row', description: 'Complete the full top row.' },
+  { key: 'middle_row', label: 'Middle Row', description: 'Complete the full center row with ★ included.' },
+  { key: 'bottom_row', label: 'Bottom Row', description: 'Complete the full bottom row.' },
+  { key: 'left_column', label: 'Left Column', description: 'Complete the full B column.' },
+  { key: 'center_column', label: 'Center Column', description: 'Complete the full N column with ★ included.' },
+  { key: 'right_column', label: 'Right Column', description: 'Complete the full O column.' },
+  { key: 'letter_v', label: 'Letter V', description: 'Complete a V shape from top corners to the center.' },
+  { key: 'letter_n', label: 'Letter N', description: 'Left column, right column, and diagonal middle connection.' },
+  { key: 'letter_u', label: 'Letter U', description: 'Left column, right column, and the bottom row.' },
+  { key: 'letter_z', label: 'Letter Z', description: 'Top row, bottom row, and diagonal connection.' }
 ];
 
 const BINGO_PATTERN_MAP = new Map(BINGO_PATTERN_POOL.map((pattern) => [pattern.key, pattern]));
@@ -490,6 +510,21 @@ function makeRoundId() {
 function pickBingoPatterns(roundId: string, count = 3) {
   const safeCount = Math.min(3, Math.max(1, count));
   return shuffleWithSeed(BINGO_PATTERN_POOL, `patterns-${roundId}`).slice(0, safeCount);
+}
+
+function getConfiguredBingoPatterns(roundId: string, count: number, selectedKeys: BingoPatternKey[]) {
+  const safeCount = Math.min(3, Math.max(1, count));
+  const selectedPatterns = selectedKeys
+    .map((key) => BINGO_PATTERN_MAP.get(key))
+    .filter(Boolean) as BingoPattern[];
+
+  if (selectedPatterns.length >= safeCount) return selectedPatterns.slice(0, safeCount);
+
+  const selectedKeySet = new Set(selectedPatterns.map((pattern) => pattern.key));
+  const fillerPatterns = shuffleWithSeed(BINGO_PATTERN_POOL, `patterns-${roundId}`)
+    .filter((pattern) => !selectedKeySet.has(pattern.key));
+
+  return [...selectedPatterns, ...fillerPatterns].slice(0, safeCount);
 }
 
 function parseBingoPatternList(content: string) {
@@ -942,6 +977,36 @@ function getBingoPatternCandidates(patternKey: BingoPatternKey) {
           [4, 2]
         ] as BingoCell[]
       ];
+    case 'top_row':
+      return [rows[0]];
+    case 'middle_row':
+      return [rows[2]];
+    case 'bottom_row':
+      return [rows[4]];
+    case 'left_column':
+      return [columns[0]];
+    case 'center_column':
+      return [columns[2]];
+    case 'right_column':
+      return [columns[4]];
+    case 'letter_v':
+      return [
+        [
+          [0, 0],
+          [0, 4],
+          [1, 1],
+          [1, 3],
+          [2, 2],
+          [3, 2],
+          [4, 2]
+        ] as BingoCell[]
+      ];
+    case 'letter_n':
+      return [uniqueCells([...columns[0], ...diagonalDown, ...columns[4]])];
+    case 'letter_u':
+      return [uniqueCells([...columns[0], ...columns[4], ...rows[4]])];
+    case 'letter_z':
+      return [uniqueCells([...rows[0], ...diagonalUp, ...rows[4]])];
     case 'picture_frame':
       return [allCells.filter(([row, column]) => row === 0 || row === 4 || column === 0 || column === 4)];
     case 'blackout':
@@ -1018,6 +1083,7 @@ export default function HomePage() {
   const [bingoCallSpeedMs, setBingoCallSpeedMs] = useState<number>(BINGO_CALL_INTERVAL_MS);
   const [bingoWinnerLimit, setBingoWinnerLimit] = useState<number>(1);
   const [bingoPatternCount, setBingoPatternCount] = useState<number>(3);
+  const [selectedBingoPatternKeys, setSelectedBingoPatternKeys] = useState<BingoPatternKey[]>([]);
   const [allowLateBingoJoiners, setAllowLateBingoJoiners] = useState(false);
   const [bingoPrizeLabel, setBingoPrizeLabel] = useState(BINGO_DEFAULT_PRIZE);
   const [adminSelectedPlayer, setAdminSelectedPlayer] = useState('');
@@ -1480,7 +1546,32 @@ export default function HomePage() {
     const nextCount = Number(value);
     if (!BINGO_PATTERN_COUNT_OPTIONS.includes(nextCount as (typeof BINGO_PATTERN_COUNT_OPTIONS)[number])) return;
     setBingoPatternCount(nextCount);
+    setSelectedBingoPatternKeys((current) => {
+      const nextSelected = current.slice(0, nextCount);
+      localStorage.setItem('bingo_selected_patterns', nextSelected.join(','));
+      return nextSelected;
+    });
     localStorage.setItem('bingo_pattern_count', String(nextCount));
+  }
+
+  function toggleSelectedBingoPattern(patternKey: BingoPatternKey) {
+    if (activeBingoRound || bingoCountdown) return;
+
+    setSelectedBingoPatternKeys((current) => {
+      const alreadySelected = current.includes(patternKey);
+      const nextSelected = alreadySelected
+        ? current.filter((key) => key !== patternKey)
+        : [...current, patternKey].slice(0, bingoPatternCount);
+
+      localStorage.setItem('bingo_selected_patterns', nextSelected.join(','));
+      return nextSelected;
+    });
+  }
+
+  function clearSelectedBingoPatterns() {
+    if (activeBingoRound || bingoCountdown) return;
+    setSelectedBingoPatternKeys([]);
+    localStorage.removeItem('bingo_selected_patterns');
   }
 
   function changeAllowLateBingoJoiners(value: boolean) {
@@ -1832,7 +1923,7 @@ export default function HomePage() {
     }
 
     const roundId = makeRoundId();
-    const patterns = pickBingoPatterns(roundId, bingoPatternCount);
+    const patterns = getConfiguredBingoPatterns(roundId, bingoPatternCount, selectedBingoPatternKeys);
     const patternText = patterns.map((pattern) => pattern.label).join(', ');
     const safePrizeLabel = sanitizeBingoSettingValue(bingoPrizeLabel) || BINGO_DEFAULT_PRIZE;
     const eligiblePlayers = Array.from(
@@ -2207,6 +2298,14 @@ export default function HomePage() {
     const savedPatternCount = Number(localStorage.getItem('bingo_pattern_count') || 3);
     if (BINGO_PATTERN_COUNT_OPTIONS.includes(savedPatternCount as (typeof BINGO_PATTERN_COUNT_OPTIONS)[number])) {
       setBingoPatternCount(savedPatternCount);
+    }
+
+    const savedSelectedPatterns = (localStorage.getItem('bingo_selected_patterns') || '')
+      .split(',')
+      .map((key) => key.trim())
+      .filter((key): key is BingoPatternKey => BINGO_PATTERN_MAP.has(key as BingoPatternKey));
+    if (savedSelectedPatterns.length) {
+      setSelectedBingoPatternKeys(savedSelectedPatterns.slice(0, savedPatternCount || 3));
     }
 
     setAllowLateBingoJoiners(localStorage.getItem('bingo_allow_late_joiners') === '1');
@@ -3243,6 +3342,32 @@ export default function HomePage() {
                   </label>
                 </div>
 
+                <div className="bingo-admin-pattern-picker">
+                  <div className="bingo-admin-pattern-heading">
+                    <span>Choose exact patterns</span>
+                    <button type="button" onClick={clearSelectedBingoPatterns} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown) || selectedBingoPatternKeys.length === 0}>Random</button>
+                  </div>
+                  <small>Selected {selectedBingoPatternKeys.length}/{bingoPatternCount}. If empty, Jarvis will randomly choose patterns.</small>
+                  <div className="bingo-admin-pattern-list">
+                    {BINGO_PATTERN_POOL.map((pattern) => {
+                      const active = selectedBingoPatternKeys.includes(pattern.key);
+                      const locked = Boolean(activeBingoRound) || Boolean(bingoCountdown) || (!active && selectedBingoPatternKeys.length >= bingoPatternCount);
+                      return (
+                        <button
+                          key={`admin-pattern-${pattern.key}`}
+                          type="button"
+                          className={active ? 'active' : ''}
+                          onClick={() => toggleSelectedBingoPattern(pattern.key)}
+                          disabled={locked}
+                          title={pattern.description}
+                        >
+                          {pattern.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="bingo-admin-actions wide">
                   <button type="button" onClick={startBingoRound}>
                     <Play size={15} /> {activeBingoRound ? 'Open BingoTV' : bingoCountdown ? 'Counting...' : 'Start Bingo'}
@@ -3303,7 +3428,7 @@ export default function HomePage() {
                       {['B', 'I', 'N', 'G', 'O'].map((letter) => <strong key={`admin-head-${letter}`}>{letter}</strong>)}
                       {adminPreviewCard.flatMap((row, rowIndex) => row.map((value, columnIndex) => {
                         const called = value === 'FREE' || (typeof value === 'number' && (bingoTvRound ? new Set(getBingoCalledNumbers(messages, bingoTvRound.roundId)).has(value) : false));
-                        return <span key={`admin-card-${rowIndex}-${columnIndex}`} className={called ? 'called' : ''}>{value}</span>;
+                        return <span key={`admin-card-${rowIndex}-${columnIndex}`} className={called ? 'called' : ''}>{value === 'FREE' ? '★' : value}</span>;
                       }))}
                     </div>
                   ) : <small>Start a round or select a player to preview their card.</small>}
@@ -3461,7 +3586,7 @@ export default function HomePage() {
                                     onClick={() => toggleBingoMark(value)}
                                     disabled={!isCurrentPlayerBingoReady && !isFree}
                                   >
-                                    <span>{value}</span>
+                                    <span>{value === 'FREE' ? '★' : value}</span>
                                   </button>
                                 );
                               })
