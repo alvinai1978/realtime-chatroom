@@ -27,3 +27,10 @@ vercel --prod
 ```
 
 After deploy, open BingoTV, hard refresh, then click Fullscreen.
+
+## v13.8 BingoTV Auto Open
+
+- Kapag verified admin si Ripple at pinindot ang **Start Bingo**, automatic na magbubukas ang separate **BingoTV** monitor window.
+- Kung may active Bingo round na, bubuksan pa rin ng Start Bingo ang BingoTV monitor para sa TV/second screen.
+- Kung i-block ng browser ang popup, lalabas ang notice at puwedeng gamitin ang admin-only **BingoTV** button.
+

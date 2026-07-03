@@ -895,12 +895,27 @@ export default function HomePage() {
     ]);
   }
 
+  function getBingoTvUrl() {
+    const tvUrl = new URL(window.location.href);
+    tvUrl.searchParams.set('bingoTV', '1');
+    return tvUrl.toString();
+  }
+
+  function openBingoTvWindow() {
+    const openedWindow = window.open(getBingoTvUrl(), 'jarvis-bingo-tv', 'popup=yes,width=1920,height=1080');
+    if (openedWindow) {
+      openedWindow.focus();
+    }
+    return openedWindow;
+  }
+
   function openBingoTvScreen() {
     if (!isAdminUser) return;
     enableBingoSounds();
-    const tvUrl = new URL(window.location.href);
-    tvUrl.searchParams.set('bingoTV', '1');
-    window.open(tvUrl.toString(), 'jarvis-bingo-tv', 'popup=yes,width=1920,height=1080');
+    const openedWindow = openBingoTvWindow();
+    if (!openedWindow) {
+      setTemporaryBingoNotice('BingoTV popup was blocked. Allow popups, then click BingoTV again.');
+    }
   }
 
   function enterBingoTvFullscreen() {
@@ -1011,9 +1026,11 @@ export default function HomePage() {
       return;
     }
 
+    const autoBingoTvWindow = openBingoTvWindow();
+
     if (activeBingoRoundRef.current) {
       setIsBingoOpen(true);
-      setTemporaryBingoNotice('May active Bingo round na. Sumali ka na lang muna.');
+      setTemporaryBingoNotice(autoBingoTvWindow ? 'May active Bingo round na. Binuksan ang BingoTV monitor.' : 'May active Bingo round na. Popup blocked ang BingoTV; click BingoTV button.');
       return;
     }
 
@@ -1038,7 +1055,7 @@ export default function HomePage() {
     );
 
     setIsBingoOpen(true);
-    setTemporaryBingoNotice('Bingo round started. Online users ngayon lang ang puwedeng sumali.');
+    setTemporaryBingoNotice(autoBingoTvWindow ? 'Bingo round started. BingoTV monitor opened automatically.' : 'Bingo round started. Popup blocked ang BingoTV; click BingoTV button.');
   }
 
   async function postNextBingoCall() {
