@@ -811,8 +811,10 @@ function getBingoCalledNumbers(currentMessages: Message[], roundId?: string) {
     .reverse()
     .find((message) => message.event_type === 'bingo_reset_calls');
   const resetTime = latestResetTime ? new Date(latestResetTime.created_at).getTime() : 0;
+  const seenNumbers = new Set<number>();
+  const calledNumbers: number[] = [];
 
-  return currentMessages
+  [...currentMessages]
     .filter((message) => {
       const messageTime = new Date(message.created_at).getTime();
       return (
@@ -821,8 +823,19 @@ function getBingoCalledNumbers(currentMessages: Message[], roundId?: string) {
         messageTime > resetTime
       );
     })
-    .map((message) => parseBingoCallNumber(message.content))
-    .filter((number): number is number => typeof number === 'number');
+    .sort((a, b) => {
+      const timeDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return Number(a.id || 0) - Number(b.id || 0);
+    })
+    .forEach((message) => {
+      const number = parseBingoCallNumber(message.content);
+      if (typeof number !== 'number' || seenNumbers.has(number)) return;
+      seenNumbers.add(number);
+      calledNumbers.push(number);
+    });
+
+  return calledNumbers;
 }
 
 function getBingoCallOrder(roundId: string) {
@@ -1896,7 +1909,7 @@ export default function HomePage() {
     await insertUniqueEvent(
       `🎱 Bingo Call #${nextIndex + 1}: ${numberToBingoLabel(nextNumber)}`,
       JARVIS_NAME,
-      `bingo-call-${round.roundId}-${Date.now()}-${nextIndex}`,
+      `bingo-call-${round.roundId}-${nextIndex}`,
       'bingo_call',
       { isAi: true }
     );
@@ -2853,7 +2866,7 @@ export default function HomePage() {
 
         <section className="bingo-tv-live-strip">
           <div>
-            <strong>Latest calls</strong>
+            <strong>Recent Called Numbers</strong>
             <div className="bingo-tv-recent-calls">
               {recentTvCalls.length ? recentTvCalls.map((number) => (
                 <span key={`recent-tv-call-${number}`} className={number === latestTvBingoCall ? 'latest' : ''}>{numberToBingoLabel(number)}</span>
@@ -2861,25 +2874,25 @@ export default function HomePage() {
             </div>
           </div>
           <div>
-            <strong>Next call</strong>
+            <strong>Next Number Preview</strong>
             <span className="bingo-tv-next-call">{nextTvCall ? numberToBingoLabel(nextTvCall) : activeBingoRound ? 'Final call reached' : 'Hidden until live'}</span>
           </div>
           <div>
-            <strong>Latest Jarvis event</strong>
+            <strong>Jarvis Bingo Status</strong>
             <span className="bingo-tv-event-text">{latestBingoTvMessage ? latestBingoTvMessage.content : 'No Bingo event yet'}</span>
           </div>
         </section>
 
         <div className={`bingo-tv-live-card ${latestTvBingoCall ? 'has-call' : 'standby'}`} key={`tv-call-${latestTvBingoCall || 'standby'}-${bingoTvCalledNumbers.length}`}>
           <span className={activeBingoRound ? 'live' : 'idle'}>{activeBingoRound ? 'LIVE ROUND' : bingoTvRound ? 'LAST ROUND' : 'STANDBY'}</span>
-          <div className="bingo-draw-machine" aria-label={latestTvBingoCall ? `Latest call ${latestTvBingoLabel}` : 'No Bingo call yet'}>
+          <div className="bingo-draw-machine" aria-label={latestTvBingoCall ? `Current drawn number ${latestTvBingoLabel}` : 'No Bingo call yet'}>
             <div className="bingo-ball-track"><span /><span /><span /></div>
             <div className="bingo-tv-call-orb">
               <em>{latestTvBingoCall ? latestTvLetter : 'BINGO'}</em>
               <strong>{latestTvBingoCall ? latestTvNumberText : '--'}</strong>
             </div>
           </div>
-          <small>Bingo Call #{bingoTvCalledNumbers.length || 0}</small>
+          <small>Call Count: {bingoTvCalledNumbers.length || 0}/75</small>
           <div className="bingo-tv-call-progress" style={{ '--progress': `${tvCallProgress}%` } as CSSProperties}>
             <span />
           </div>
@@ -3484,7 +3497,7 @@ export default function HomePage() {
                 )}
 
                 <div className="called-board">
-                  <p className="bingo-section-title">Called numbers</p>
+                  <p className="bingo-section-title">Official Called Numbers</p>
                   <div>
                     {bingoCalledNumbers.length ? (
                       bingoCalledNumbers.slice(-18).map((number) => <span key={`called-${number}`}>{numberToBingoLabel(number)}</span>)

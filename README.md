@@ -1,8 +1,8 @@
-# Realtime Chatroom Jarvis v14.5
+# Realtime Chatroom Jarvis v14.7
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, at Jarvis-hosted Bingo.
 
-## New in v14.5
+## New in v14.7
 
 - Full Ripple-only Admin Control Panel.
 - Admin buttons: Start Bingo, End Bingo, Reset Calls, Reset Scores display, Kick User, Mute/Unmute User, Clear Chat, and View Winners.
@@ -122,3 +122,10 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - Jarvis waits during setup phase and does not draw the first Bingo number until joined players are ready.
 - Once a player presses Ready, that player's card setup locks for anti-cheat protection.
 - Card settings are still limited to a maximum of 4 cards, with 2 cards per row on mobile.
+
+## v14.7 Called Numbers Fix
+
+- Fixed duplicate called numbers caused by multiple connected clients trying to post the same Bingo call at the same time.
+- Bingo call event keys are now deterministic per round and call index, so duplicate calls are skipped by the existing unique event protection.
+- The called numbers display now removes duplicate numbers from older rounds/messages while preserving the official call order.
+- BingoTV wording was clarified: Latest Call was renamed into clearer labels such as Current Drawn Number, Recent Called Numbers, and Call Count.
