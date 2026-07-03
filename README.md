@@ -144,3 +144,12 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - If Ripple selects Letter Z, player screens and BingoTV will now read the exact `letter_z` pattern key instead of falling back to a random pattern such as Cross.
 - Hard-fixed the Bingo card center value so generated cards use the actual `★` symbol instead of storing or rendering `FREE`.
 - Existing old Bingo rounds may still show their old pattern data; start a fresh Bingo round after deploying this update.
+
+
+## v15.0 Pattern Sync Hard Fix
+
+- Fixed admin-selected pattern mismatch between Ripple admin, players, BingoTV, and verification.
+- Exact selected patterns now override random fill. If Ripple selects only Letter Z, the round uses only Letter Z.
+- Added machine-readable `[PATTERN_KEYS: ...]` metadata to Bingo start events so every device reads the same official pattern keys.
+- Kept center card value as `★` for all generated player cards and admin preview cards.
+- Start a fresh new Bingo round after deploy so old round data does not keep the previous pattern list.

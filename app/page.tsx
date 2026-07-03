@@ -514,24 +514,25 @@ function pickBingoPatterns(roundId: string, count = 3) {
 
 function getConfiguredBingoPatterns(roundId: string, count: number, selectedKeys: BingoPatternKey[]) {
   const safeCount = Math.min(3, Math.max(1, count));
-  const selectedPatterns = selectedKeys
+  const uniqueSelectedKeys = Array.from(new Set(selectedKeys)).filter((key) => BINGO_PATTERN_MAP.has(key));
+  const selectedPatterns = uniqueSelectedKeys
     .map((key) => BINGO_PATTERN_MAP.get(key))
     .filter(Boolean) as BingoPattern[];
 
-  if (selectedPatterns.length >= safeCount) return selectedPatterns.slice(0, safeCount);
+  // Exact admin choice wins. If Ripple selected Letter Z only, the round uses Letter Z only.
+  // Jarvis fills random patterns ONLY when admin did not select any exact pattern.
+  if (selectedPatterns.length > 0) return selectedPatterns.slice(0, 3);
 
-  const selectedKeySet = new Set(selectedPatterns.map((pattern) => pattern.key));
-  const fillerPatterns = shuffleWithSeed(BINGO_PATTERN_POOL, `patterns-${roundId}`)
-    .filter((pattern) => !selectedKeySet.has(pattern.key));
-
-  return [...selectedPatterns, ...fillerPatterns].slice(0, safeCount);
+  return shuffleWithSeed(BINGO_PATTERN_POOL, `patterns-${roundId}`).slice(0, safeCount);
 }
 
 function parseBingoPatternList(content: string) {
-  const keyMatch = content.match(/\[PATTERNS:\s*([^\]]*)\]/i);
+  // Single source of truth for player, admin, verification, and BingoTV.
+  // Prioritize machine-readable keys so labels like "Cross / Plus" or "Letter Z" never mismatch.
+  const keyMatch = content.match(/\[(?:PATTERN_KEYS|PATTERNS):\s*([^\]]*)\]/i);
   if (keyMatch) {
     const patternsFromKeys = keyMatch[1]
-      .split('|')
+      .split(/[|,]/)
       .map((item) => item.trim().toLowerCase() as BingoPatternKey)
       .map((key) => BINGO_PATTERN_MAP.get(key))
       .filter(Boolean) as BingoPattern[];
@@ -539,7 +540,7 @@ function parseBingoPatternList(content: string) {
     if (patternsFromKeys.length) return patternsFromKeys;
   }
 
-  const textMatch = content.match(/Patterns to win:\s*(.*?)(?:\.\s+(?:Eligible players|Late joiners|Join using|\[ELIGIBLE|$)|\[ELIGIBLE|$)/i);
+  const textMatch = content.match(/Patterns to win:\s*(.*?)(?:\.\s+(?:Eligible players|Late joiners|Join using|\[ELIGIBLE|\[SETTINGS|$)|\[ELIGIBLE|\[SETTINGS|$)/i);
   if (!textMatch) return [];
 
   return textMatch[1]
@@ -549,6 +550,17 @@ function parseBingoPatternList(content: string) {
       BINGO_PATTERN_POOL.find((pattern) => normalizeText(pattern.label) === label)
     )
     .filter(Boolean) as BingoPattern[];
+}
+
+function readStoredBingoPatternKeys(fallbackKeys: BingoPatternKey[]) {
+  if (typeof window === 'undefined') return fallbackKeys;
+
+  const storedKeys = (localStorage.getItem('bingo_selected_patterns') || '')
+    .split(',')
+    .map((key) => key.trim().toLowerCase() as BingoPatternKey)
+    .filter((key) => BINGO_PATTERN_MAP.has(key));
+
+  return storedKeys.length ? storedKeys : fallbackKeys;
 }
 
 function normalizeBingoPlayerName(name: string) {
@@ -1908,7 +1920,7 @@ export default function HomePage() {
 
     window.setTimeout(async () => {
       await insertUniqueEvent(
-        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. [PATTERNS: ${serializeBingoPatternKeys(patterns)}] Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${quickPatternCount}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
+        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. [PATTERN_KEYS: ${serializeBingoPatternKeys(patterns)}] [PATTERNS: ${serializeBingoPatternKeys(patterns)}] Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${patterns.length}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
         JARVIS_NAME,
         `bingo-start-${roundId}`,
         'bingo_start',
@@ -1944,8 +1956,10 @@ export default function HomePage() {
     }
 
     const roundId = makeRoundId();
-    const patterns = getConfiguredBingoPatterns(roundId, bingoPatternCount, selectedBingoPatternKeys);
+    const latestSelectedPatternKeys = readStoredBingoPatternKeys(selectedBingoPatternKeys);
+    const patterns = getConfiguredBingoPatterns(roundId, bingoPatternCount, latestSelectedPatternKeys);
     const patternText = patterns.map((pattern) => pattern.label).join(', ');
+    const patternKeysText = serializeBingoPatternKeys(patterns);
     const safePrizeLabel = sanitizeBingoSettingValue(bingoPrizeLabel) || BINGO_DEFAULT_PRIZE;
     const eligiblePlayers = Array.from(
       new Set<string>(
@@ -1968,7 +1982,7 @@ export default function HomePage() {
 
     window.setTimeout(async () => {
       await insertUniqueEvent(
-        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. [PATTERNS: ${serializeBingoPatternKeys(patterns)}] Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${bingoPatternCount}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
+        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. [PATTERN_KEYS: ${patternKeysText}] [PATTERNS: ${patternKeysText}] Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${patterns.length}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
         JARVIS_NAME,
         `bingo-start-${roundId}`,
         'bingo_start',
@@ -3368,7 +3382,7 @@ export default function HomePage() {
                     <span>Choose exact patterns</span>
                     <button type="button" onClick={clearSelectedBingoPatterns} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown) || selectedBingoPatternKeys.length === 0}>Random</button>
                   </div>
-                  <small>Selected {selectedBingoPatternKeys.length}/{bingoPatternCount}. If empty, Jarvis will randomly choose patterns.</small>
+                  <small>Selected {selectedBingoPatternKeys.length}/{bingoPatternCount}. Selected patterns are exact. If empty, Jarvis randomly chooses patterns.</small>
                   <div className="bingo-admin-pattern-list">
                     {BINGO_PATTERN_POOL.map((pattern) => {
                       const active = selectedBingoPatternKeys.includes(pattern.key);
