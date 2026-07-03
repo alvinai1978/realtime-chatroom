@@ -79,3 +79,9 @@ vercel --prod
 ## Notes
 
 This version keeps using the existing `messages`, `user_scores`, and `score_events` setup. Some admin actions are stored as event messages for realtime sync and audit history.
+
+
+## v14.1 BingoTV QR Placement
+
+- Moved the BingoTV QR code to the right-side panel under the Winner Verification Report.
+- The QR card now auto-fits inside the fixed 75-inch TV layout.

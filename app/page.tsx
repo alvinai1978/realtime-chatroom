@@ -2549,22 +2549,32 @@ export default function HomePage() {
             <span>Winner Verification Report</span>
             <small>Jarvis checks claims vs. official called list</small>
           </div>
-          {latestBingoVerification ? (
-            <div className="bingo-tv-report-stack">
-              {bingoVerificationMessages.slice(-4).reverse().map((verification) => (
-                <div key={verification.id} className={`bingo-tv-report ${verification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
-                  <strong>{verification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
-                  <p>{verification.content}</p>
-                  <small>{formatTime(verification.created_at)}</small>
-                </div>
-              ))}
+          <div className="bingo-tv-report-content">
+            {latestBingoVerification ? (
+              <div className="bingo-tv-report-stack">
+                {bingoVerificationMessages.slice(-4).reverse().map((verification) => (
+                  <div key={verification.id} className={`bingo-tv-report ${verification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
+                    <strong>{verification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
+                    <p>{verification.content}</p>
+                    <small>{formatTime(verification.created_at)}</small>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bingo-tv-report pending">
+                <strong>No winner yet</strong>
+                <p>Kapag may user na pumindot ng BINGO, lalabas dito ang verification result ni Jarvis.</p>
+              </div>
+            )}
+            <div className="bingo-tv-qr-card bingo-tv-report-qr-card">
+              <QrCode size={22} />
+              <div>
+                <strong>Scan to join</strong>
+                <small>{playerJoinUrl || 'Open the chatroom link'}</small>
+              </div>
+              {playerJoinUrl ? <img alt="Chatroom QR code" src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeQrData(playerJoinUrl)}`} /> : null}
             </div>
-          ) : (
-            <div className="bingo-tv-report pending">
-              <strong>No winner yet</strong>
-              <p>Kapag may user na pumindot ng BINGO, lalabas dito ang verification result ni Jarvis.</p>
-            </div>
-          )}
+          </div>
         </section>
 
         <section className="bingo-tv-panel bingo-tv-side-panel">
@@ -2593,14 +2603,6 @@ export default function HomePage() {
               <span>Call Speed</span>
               <strong>{formatBingoSeconds(bingoTvRound?.callIntervalMs || BINGO_CALL_INTERVAL_MS)}</strong>
             </div>
-          </div>
-          <div className="bingo-tv-qr-card">
-            <QrCode size={22} />
-            <div>
-              <strong>Scan to join</strong>
-              <small>{playerJoinUrl || 'Open the chatroom link'}</small>
-            </div>
-            {playerJoinUrl ? <img alt="Chatroom QR code" src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeQrData(playerJoinUrl)}`} /> : null}
           </div>
           <div className="bingo-tv-actions">
             <button type="button" onClick={enableBingoSounds}>
