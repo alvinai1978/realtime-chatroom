@@ -3982,3 +3982,192 @@ button {
     font-size: clamp(0.48rem, 0.58vw, 0.7rem) !important;
   }
 }
+
+/* v14.3 mobile chatroom controls + full date/time stamps */
+.mobile-quick-actions,
+.mobile-pop-panel {
+  display: none;
+}
+
+.message-meta time {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .mobile-quick-actions {
+    position: fixed;
+    top: max(8px, env(safe-area-inset-top));
+    left: 8px;
+    right: 8px;
+    z-index: 120;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+    padding: 7px;
+    border: 1px solid rgba(223, 229, 239, 0.9);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-quick-actions button {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(145deg, #0a7cff, #7c3aed);
+    color: white;
+    font-size: 0.82rem;
+    font-weight: 1000;
+    letter-spacing: -0.01em;
+  }
+
+  .mobile-pop-panel {
+    position: fixed;
+    top: calc(max(8px, env(safe-area-inset-top)) + 62px);
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 119;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    border: 1px solid rgba(223, 229, 239, 0.95);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+    padding: 12px;
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-pop-panel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex: 0 0 auto;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #0a7cff, #7c3aed);
+    color: white;
+    padding: 12px;
+  }
+
+  .mobile-pop-panel header h3,
+  .mobile-pop-panel header p {
+    margin: 0;
+  }
+
+  .mobile-pop-panel header h3 {
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
+
+  .mobile-pop-panel header button {
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: white;
+    padding: 9px 12px;
+    font-weight: 900;
+  }
+
+  .mobile-profile-card,
+  .mobile-user-panel,
+  .mobile-invite-card {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--panel-soft);
+    padding: 12px;
+  }
+
+  .mobile-profile-card p,
+  .mobile-invite-card p {
+    margin: 0 0 9px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 900;
+  }
+
+  .mobile-user-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .user-list.mobile {
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 180px;
+  }
+
+  .mobile-invite-card {
+    display: grid;
+    place-items: center;
+    text-align: center;
+    gap: 9px;
+  }
+
+  .mobile-invite-card strong {
+    color: var(--text);
+    font-size: 1rem;
+  }
+
+  .mobile-invite-card img {
+    width: min(72vw, 280px);
+    height: min(72vw, 280px);
+    display: block;
+    border-radius: 18px;
+    background: white;
+    padding: 10px;
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.14);
+  }
+
+  .mobile-invite-card small {
+    max-width: 100%;
+    color: var(--muted);
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+  }
+
+  .bingo-tab {
+    display: none;
+  }
+
+  .messenger-shell {
+    grid-template-rows: minmax(0, 1fr);
+    padding-top: calc(max(8px, env(safe-area-inset-top)) + 64px);
+  }
+
+  .sidebar.joined {
+    display: none;
+  }
+
+  .chat-panel {
+    grid-row: 1;
+  }
+
+  .bingo-drawer {
+    top: calc(max(8px, env(safe-area-inset-top)) + 62px);
+    bottom: 8px;
+    max-height: none;
+  }
+
+  .message-meta {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    font-size: 0.66rem;
+    line-height: 1.25;
+  }
+
+  .message-meta time {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+}

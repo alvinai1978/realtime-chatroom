@@ -92,3 +92,11 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - Fixed BingoTV QR code visibility under the Winner Verification Report.
 - Enlarged the QR code and prevented the Smart TV layout from clipping it.
 - Updated QR generation size for sharper scanning on TV screens.
+
+## v14.3 Mobile Controls + Date/Time Update
+
+- Chat message meta now shows full non-military date/time format, for example: `Alvin -Friday 07/3/26 - 5:33pm`.
+- On mobile, the Bingo button is moved to the top quick-action bar.
+- Added mobile Profile button with Profile + Avatar controls and Users list in a separate panel.
+- Added mobile Invite button with QR code in a separate panel.
+- Mobile joined view hides the old sidebar content so the chat screen has more space.

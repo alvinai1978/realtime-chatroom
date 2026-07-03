@@ -262,6 +262,20 @@ function formatTime(value: string) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatChatDateTime(value: string) {
+  const date = new Date(value);
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = date.getDate();
+  const year = String(date.getFullYear()).slice(-2);
+  const hour = date.getHours();
+  const hour12 = hour % 12 || 12;
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  const suffix = hour >= 12 ? 'pm' : 'am';
+
+  return `${weekday} ${month}/${day}/${year} - ${hour12}:${minute}${suffix}`;
+}
+
 function initials(name: string) {
   return name
     .split(' ')
@@ -872,6 +886,8 @@ export default function HomePage() {
   const [confettiPieces, setConfettiPieces] = useState<ConfettiPiece[]>([]);
   const [celebrationText, setCelebrationText] = useState('');
   const [isBingoOpen, setIsBingoOpen] = useState(false);
+  const [isProfilePanelOpen, setIsProfilePanelOpen] = useState(false);
+  const [isInvitePanelOpen, setIsInvitePanelOpen] = useState(false);
   const [isBingoParticipant, setIsBingoParticipant] = useState(false);
   const [bingoMarkedNumbers, setBingoMarkedNumbers] = useState<number[]>([]);
   const [bingoNotice, setBingoNotice] = useState('');
@@ -990,6 +1006,8 @@ export default function HomePage() {
       return messageTime >= startedAt && Boolean(message.event_type?.startsWith('bingo_'));
     }) || null;
   }, [messages, bingoTvRound?.roundId, bingoTvRound?.startedAt]);
+
+  const chatInviteUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
 
   const canJoinActiveBingo = useMemo(
     () => Boolean(activeBingoRound && myName && isBingoEligiblePlayer(activeBingoRound, myName)),
@@ -2556,7 +2574,7 @@ export default function HomePage() {
                   <div key={verification.id} className={`bingo-tv-report ${verification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
                     <strong>{verification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
                     <p>{verification.content}</p>
-                    <small>{formatTime(verification.created_at)}</small>
+                    <small>{formatChatDateTime(verification.created_at)}</small>
                   </div>
                 ))}
               </div>
@@ -2637,6 +2655,121 @@ export default function HomePage() {
           ))}
           <div className="top-score-toast">{celebrationText}</div>
         </div>
+      ) : null}
+
+      {myName ? (
+        <div className="mobile-quick-actions" aria-label="Mobile quick actions">
+          <button
+            type="button"
+            onClick={() => {
+              setIsBingoOpen(true);
+              setIsProfilePanelOpen(false);
+              setIsInvitePanelOpen(false);
+            }}
+          >
+            <Gamepad2 size={16} /> Bingo
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsProfilePanelOpen(true);
+              setIsInvitePanelOpen(false);
+              setIsBingoOpen(false);
+            }}
+          >
+            <UserCog size={16} /> Profile
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsInvitePanelOpen(true);
+              setIsProfilePanelOpen(false);
+              setIsBingoOpen(false);
+            }}
+          >
+            <QrCode size={16} /> Invite
+          </button>
+        </div>
+      ) : null}
+
+      {myName && isProfilePanelOpen ? (
+        <section className="mobile-pop-panel" aria-label="Profile and users">
+          <header>
+            <div>
+              <p className="small-label">Profile center</p>
+              <h3>Profile + Users</h3>
+            </div>
+            <button type="button" onClick={() => setIsProfilePanelOpen(false)}>Close</button>
+          </header>
+          <div className="mobile-profile-card">
+            <p><UserCog size={14} /> Choose avatar</p>
+            <div className="avatar-picker">
+              {USER_PROFILE_AVATARS.map((avatar) => (
+                <button key={`mobile-${avatar}`} type="button" className={userAvatar === avatar ? 'active' : ''} onClick={() => changeUserAvatar(avatar)}>{avatar}</button>
+              ))}
+            </div>
+            <p><Sparkles size={14} /> Profile color</p>
+            <div className="profile-color-picker">
+              {USER_PROFILE_COLORS.map((color) => (
+                <button
+                  key={`mobile-${color.key}`}
+                  type="button"
+                  className={userProfileColor === color.key ? 'active' : ''}
+                  style={{ '--profile-color': color.color } as CSSProperties}
+                  onClick={() => changeUserProfileColor(color.key)}
+                >
+                  {color.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mobile-user-panel">
+            <div className="list-header">
+              <span><Users size={16} /> Users</span>
+              <strong>{onlineCount} online</strong>
+            </div>
+            <div className="user-list mobile" role="listbox" aria-label="Mobile chat users">
+              {userList.map((user) => {
+                const userAccentStyle = getProfileColorStyle(user.profileColor || '', user.name);
+
+                return (
+                  <button
+                    key={`mobile-${user.key}-${user.name}`}
+                    type="button"
+                    className={`user-item ${selectedSender === user.name ? 'active' : ''}`}
+                    style={userAccentStyle}
+                    onClick={() => selectSender(user.name)}
+                  >
+                    <span className="user-avatar">{user.avatar || getDefaultAvatar(user.name)}</span>
+                    <span>
+                      <strong className="name-color">{user.name}</strong>
+                      <small>{selectedSender === user.name ? 'Selected participant' : 'Tap to highlight'} · Score: {scoreMap.get(user.name) || 0}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {myName && isInvitePanelOpen ? (
+        <section className="mobile-pop-panel invite" aria-label="Invite QR code">
+          <header>
+            <div>
+              <p className="small-label">Invite players</p>
+              <h3>Scan QR Code</h3>
+            </div>
+            <button type="button" onClick={() => setIsInvitePanelOpen(false)}>Close</button>
+          </header>
+          <div className="mobile-invite-card">
+            <QrCode size={30} />
+            <strong>Invite to Jarvis Chatroom</strong>
+            <p>Pa-scan ito sa ibang phone para makapasok agad sa chatroom at Bingo game.</p>
+            {chatInviteUrl ? <img alt="Chatroom invite QR code" src={`https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeQrData(chatInviteUrl)}`} /> : null}
+            <small>{chatInviteUrl || 'Open the chatroom link'}</small>
+          </div>
+        </section>
       ) : null}
 
       {myName ? (
@@ -2734,7 +2867,7 @@ export default function HomePage() {
                     {bingoWinnerRecords.length ? (
                       bingoWinnerRecords.slice(0, 6).map((record, index) => (
                         <small key={`${record.roundId}-${record.name}-${index}`}>
-                          {formatTime(record.time)} · {record.name || 'Winner'} · Round {record.roundId || '-'} · {record.pattern} · +{record.score} · {record.verification}
+                          {formatChatDateTime(record.time)} · {record.name || 'Winner'} · Round {record.roundId || '-'} · {record.pattern} · +{record.score} · {record.verification}
                         </small>
                       ))
                     ) : (
@@ -3154,7 +3287,7 @@ export default function HomePage() {
                   <div className="bubble-group">
                     <div className="message-meta">
                       <span className="name-color">{message.user_name}</span>
-                      <time>{formatTime(message.created_at)}</time>
+                      <time>-{formatChatDateTime(message.created_at)}</time>
                     </div>
                     <div className="bubble">{message.content}</div>
                   </div>
