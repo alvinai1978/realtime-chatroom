@@ -115,3 +115,10 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - Users can type requests like `Jarvis start bingo`, `start bingo`, `pa start ng bingo`, or press **Ask Jarvis to Start Bingo** in the Bingo panel.
 - Jarvis starts a default community round with 3 winning patterns, 8-second calls, 1 winner limit, and late joiners locked until the next round.
 - Ripple admin controls remain protected by the Ripple password gate; only Ripple can use admin tools, reset controls, BingoTV button, kick/mute, and settings.
+
+## v14.6 Player Ready Setup Phase
+
+- Players can join a Bingo round, configure their cards, then press **Ready** before Jarvis calls the first number.
+- Jarvis waits during setup phase and does not draw the first Bingo number until joined players are ready.
+- Once a player presses Ready, that player's card setup locks for anti-cheat protection.
+- Card settings are still limited to a maximum of 4 cards, with 2 cards per row on mobile.

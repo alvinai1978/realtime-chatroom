@@ -638,6 +638,46 @@ function getBingoJoinedPlayers(currentMessages: Message[], roundId?: string, eli
   return Array.from(players).sort((a, b) => a.localeCompare(b));
 }
 
+function getBingoActualJoinedPlayers(currentMessages: Message[], roundId?: string) {
+  const players = new Set<string>();
+  if (!roundId) return [];
+
+  currentMessages.forEach((message) => {
+    if (message.event_type !== 'bingo_join') return;
+    if (!message.event_key?.startsWith(`bingo-join-${roundId}-`)) return;
+    const target = parseAdminTarget(message.content) || message.user_name;
+    if (target) players.add(cleanName(target));
+  });
+
+  return Array.from(players).sort((a, b) => a.localeCompare(b));
+}
+
+function getBingoReadyPlayers(currentMessages: Message[], roundId?: string) {
+  const players = new Set<string>();
+  if (!roundId) return [];
+
+  currentMessages.forEach((message) => {
+    if (message.event_type !== 'bingo_ready') return;
+    if (!message.event_key?.startsWith(`bingo-ready-${roundId}-`)) return;
+    const target = parseAdminTarget(message.content) || message.user_name;
+    if (target) players.add(cleanName(target));
+  });
+
+  return Array.from(players).sort((a, b) => a.localeCompare(b));
+}
+
+function isPlayerBingoReady(readyPlayers: string[], userName: string) {
+  if (!userName) return false;
+  const normalizedName = normalizeBingoPlayerName(userName);
+  return readyPlayers.some((player) => normalizeBingoPlayerName(player) === normalizedName);
+}
+
+function allJoinedBingoPlayersReady(joinedPlayers: string[], readyPlayers: string[]) {
+  if (!joinedPlayers.length) return false;
+  const readySet = new Set(readyPlayers.map((player) => normalizeBingoPlayerName(player)));
+  return joinedPlayers.every((player) => readySet.has(normalizeBingoPlayerName(player)));
+}
+
 function parseBingoWinnerRecord(message: Message) {
   const content = message.content;
   const name = content.match(/Winner #\d+:\s*([^\s].*?)\s+wins Round/i)?.[1]?.trim() || '';
@@ -1043,7 +1083,6 @@ export default function HomePage() {
     [activeBingoRound?.roundId, myName, bingoCardCount, bingoCardMode, bingoCardChoice, bingoCardSeed]
   );
   const bingoCard = bingoCards[0] || null;
-  const canEditBingoCards = Boolean(activeBingoRound && (!isBingoParticipant || bingoCalledNumbers.length === 0));
   const latestBingoCall = bingoCalledNumbers.length ? bingoCalledNumbers[bingoCalledNumbers.length - 1] : null;
   const nextBingoCallNumber = useMemo(() => {
     if (!activeBingoRound) return null;
@@ -1074,6 +1113,31 @@ export default function HomePage() {
   const bingoJoinedPlayers = useMemo(
     () => getBingoJoinedPlayers(messages, bingoTvRound?.roundId, bingoTvRound?.eligiblePlayers || []),
     [messages, bingoTvRound?.roundId, bingoTvRound?.eligiblePlayers.join('|')]
+  );
+  const bingoActualJoinedPlayers = useMemo(
+    () => getBingoActualJoinedPlayers(messages, activeBingoRound?.roundId),
+    [messages, activeBingoRound?.roundId]
+  );
+  const bingoTvActualJoinedPlayers = useMemo(
+    () => getBingoActualJoinedPlayers(messages, bingoTvRound?.roundId),
+    [messages, bingoTvRound?.roundId]
+  );
+  const bingoReadyPlayers = useMemo(
+    () => getBingoReadyPlayers(messages, activeBingoRound?.roundId),
+    [messages, activeBingoRound?.roundId]
+  );
+  const bingoTvReadyPlayers = useMemo(
+    () => getBingoReadyPlayers(messages, bingoTvRound?.roundId),
+    [messages, bingoTvRound?.roundId]
+  );
+  const isCurrentPlayerBingoReady = useMemo(
+    () => isPlayerBingoReady(bingoReadyPlayers, myName),
+    [bingoReadyPlayers, myName]
+  );
+  const canEditBingoCards = Boolean(activeBingoRound && (!isBingoParticipant || (!isCurrentPlayerBingoReady && bingoCalledNumbers.length === 0)));
+  const allActiveJoinedPlayersReady = useMemo(
+    () => allJoinedBingoPlayersReady(bingoActualJoinedPlayers, bingoReadyPlayers),
+    [bingoActualJoinedPlayers, bingoReadyPlayers]
   );
   const adminCardPlayer = adminSelectedPlayer || bingoJoinedPlayers[0] || myName;
   const adminPreviewCard = useMemo(
@@ -1587,7 +1651,44 @@ export default function HomePage() {
     );
     setIsBingoParticipant(true);
     setIsBingoOpen(true);
-    setTemporaryBingoNotice(`${bingoCardCount} Bingo card${bingoCardCount > 1 ? 's' : ''} ready. Markahan lang ang mga number na tinawag ni Jarvis.`);
+    setTemporaryBingoNotice(`${bingoCardCount} Bingo card${bingoCardCount > 1 ? 's' : ''} generated. Review your setup, then press Ready before Jarvis calls the first number.`);
+  }
+
+
+  async function markPlayerBingoReady() {
+    if (!activeBingoRound || !myName) {
+      setTemporaryBingoNotice('Wala pang active Bingo round para i-ready ang card.');
+      return;
+    }
+
+    if (!isBingoParticipant) {
+      setTemporaryBingoNotice('Join Bingo muna, setup ang cards, then press Ready.');
+      return;
+    }
+
+    if (bingoCalledNumbers.length > 0) {
+      setTemporaryBingoNotice('Nagsimula na ang calls. Locked na ang card setup.');
+      return;
+    }
+
+    if (isCurrentPlayerBingoReady) {
+      setTemporaryBingoNotice('Ready ka na sa Bingo round na ito. Hintayin si Jarvis mag-start ng calls.');
+      return;
+    }
+
+    const readyMessage = await insertUniqueEvent(
+      `✅ ${myName} is READY for Bingo Round ${activeBingoRound.roundId}. Cards locked: ${bingoCardCount}. Mode: ${bingoCardMode}. Choice: ${bingoCardChoice}. [TARGET: ${myName}] [READY: count=${bingoCardCount}|mode=${bingoCardMode}|choice=${bingoCardChoice}]`,
+      'System',
+      `bingo-ready-${activeBingoRound.roundId}-${eventSafeSlug(myName)}`,
+      'bingo_ready',
+      { isAi: true }
+    );
+
+    if (readyMessage) {
+      setTemporaryBingoNotice('Ready ka na! Jarvis will start calling once joined players are ready.');
+    } else {
+      setTemporaryBingoNotice('Ready status already saved. Hintayin si Jarvis mag-call.');
+    }
   }
 
   function toggleBingoMark(value: BingoCellValue) {
@@ -1682,7 +1783,7 @@ export default function HomePage() {
 
     window.setTimeout(async () => {
       await insertUniqueEvent(
-        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${quickPatternCount}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
+        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${quickPatternCount}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
         JARVIS_NAME,
         `bingo-start-${roundId}`,
         'bingo_start',
@@ -1742,7 +1843,7 @@ export default function HomePage() {
 
     window.setTimeout(async () => {
       await insertUniqueEvent(
-        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${bingoPatternCount}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
+        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${bingoPatternCount}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
         JARVIS_NAME,
         `bingo-start-${roundId}`,
         'bingo_start',
@@ -1777,6 +1878,15 @@ export default function HomePage() {
         { isAi: true }
       );
       return;
+    }
+
+    if (calledNumbers.length === 0) {
+      const joinedPlayers = getBingoActualJoinedPlayers(messagesRef.current, round.roundId);
+      const readyPlayers = getBingoReadyPlayers(messagesRef.current, round.roundId);
+
+      if (!allJoinedBingoPlayersReady(joinedPlayers, readyPlayers)) {
+        return;
+      }
     }
 
     const nextIndex = calledNumbers.length;
@@ -2882,6 +2992,10 @@ export default function HomePage() {
               <strong>{bingoTvRound?.eligiblePlayers.length || 0}</strong>
             </div>
             <div>
+              <span>Ready Players</span>
+              <strong>{bingoTvReadyPlayers.length}/{bingoTvActualJoinedPlayers.length}</strong>
+            </div>
+            <div>
               <span>Numbers Called</span>
               <strong>{bingoTvCalledNumbers.length}/75</strong>
             </div>
@@ -3198,8 +3312,8 @@ export default function HomePage() {
               <>
                 <div className="bingo-status-card">
                   <strong>Round {activeBingoRound.roundId}</strong>
-                  <span>Current call: {latestBingoCall ? numberToBingoLabel(latestBingoCall) : 'Waiting...'}</span>
-                  <small>Prize: {activeBingoRound.prizeLabel} · Calls every {formatBingoSeconds(activeBingoRound.callIntervalMs)} · Winners {activeBingoWinners.length}/{activeBingoRound.winnerLimit}</small>
+                  <span>Current call: {latestBingoCall ? numberToBingoLabel(latestBingoCall) : allActiveJoinedPlayersReady ? 'Waiting for Jarvis...' : 'Setup/Ready phase'}</span>
+                  <small>Prize: {activeBingoRound.prizeLabel} · Calls every {formatBingoSeconds(activeBingoRound.callIntervalMs)} · Winners {activeBingoWinners.length}/{activeBingoRound.winnerLimit} · Ready {bingoReadyPlayers.length}/{bingoActualJoinedPlayers.length}</small>
                 </div>
 
                 <div className="bingo-patterns">
@@ -3266,7 +3380,7 @@ export default function HomePage() {
                       <RotateCcw size={14} /> Change cards
                     </button>
                   </div>
-                  <small>{canEditBingoCards ? 'You can change cards before the first Bingo call. Maximum 4 cards.' : 'Cards are locked after the first Bingo call to prevent cheating.'}</small>
+                  <small>{canEditBingoCards ? 'Setup your cards before the first call. Press Ready after setup. Maximum 4 cards.' : isCurrentPlayerBingoReady ? 'Ready submitted. Cards are locked for this round.' : 'Cards are locked after the first Bingo call to prevent cheating.'}</small>
                   {bingoCardNotice ? <em>{bingoCardNotice}</em> : null}
                 </div>
 
@@ -3296,6 +3410,22 @@ export default function HomePage() {
 
                 {isBingoParticipant && bingoCards.length ? (
                   <>
+                    <div className={`bingo-ready-card ${isCurrentPlayerBingoReady ? 'is-ready' : ''}`}>
+                      <div>
+                        <strong>{isCurrentPlayerBingoReady ? 'Ready submitted' : 'Setup your cards first'}</strong>
+                        <small>
+                          {bingoCalledNumbers.length > 0
+                            ? 'Bingo calls already started. Card setup is locked.'
+                            : isCurrentPlayerBingoReady
+                              ? 'Your cards are locked. Jarvis will begin when all joined players are ready.'
+                              : 'Choose card count, card type, card color, then press Ready. Jarvis will not call the first number until joined players are ready.'}
+                        </small>
+                      </div>
+                      <button type="button" onClick={markPlayerBingoReady} disabled={isCurrentPlayerBingoReady || bingoCalledNumbers.length > 0}>
+                        {isCurrentPlayerBingoReady ? 'READY' : 'I am Ready'}
+                      </button>
+                    </div>
+
                     <div className={`bingo-card-stack cards-${bingoCards.length}`} style={bingoMarkStyle}>
                       {bingoCards.map((card, cardIndex) => (
                         <div key={`player-card-${cardIndex}`} className="bingo-card-wrap">
@@ -3316,6 +3446,7 @@ export default function HomePage() {
                                     type="button"
                                     className={`bingo-cell ${isFree ? 'free' : ''} ${isCalled ? 'called' : ''} ${isMarked ? 'marked' : ''}`}
                                     onClick={() => toggleBingoMark(value)}
+                                    disabled={!isCurrentPlayerBingoReady && !isFree}
                                   >
                                     <span>{value}</span>
                                   </button>
@@ -3340,8 +3471,8 @@ export default function HomePage() {
                   <div className="bingo-join-card">
                     {canJoinActiveBingo ? (
                       <>
-                        <p>Gusto mong sumali? Piliin kung ilan ang cards mo, then Jarvis will generate up to 4 B-I-N-G-O cards for this round.</p>
-                        <button type="button" onClick={joinBingoRound}>Join Bingo</button>
+                        <p>Gusto mong sumali? Piliin muna ang card setup mo, then press Ready. Jarvis will wait before calling the first number.</p>
+                        <button type="button" onClick={joinBingoRound}>Join & Setup Cards</button>
                       </>
                     ) : (
                       <>
