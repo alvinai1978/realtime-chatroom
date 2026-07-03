@@ -137,3 +137,10 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - If Ripple leaves the pattern picker empty, Jarvis randomly chooses the required number of patterns.
 - Added 10 more pattern options: Top Row, Middle Row, Bottom Row, Left Column, Center Column, Right Column, Letter V, Letter N, Letter U, and Letter Z.
 - Player/requested Jarvis community rounds can still auto-pick patterns when no admin selection is used.
+
+## v14.9 Pattern Sync + Star Center Hard Fix
+
+- Fixed admin-selected pattern syncing by storing exact pattern keys inside the Bingo start event.
+- If Ripple selects Letter Z, player screens and BingoTV will now read the exact `letter_z` pattern key instead of falling back to a random pattern such as Cross.
+- Hard-fixed the Bingo card center value so generated cards use the actual `★` symbol instead of storing or rendering `FREE`.
+- Existing old Bingo rounds may still show their old pattern data; start a fresh Bingo round after deploying this update.

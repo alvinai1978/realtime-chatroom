@@ -49,7 +49,7 @@ type JarvisQuestion = {
   displayAnswer: string;
 };
 
-type BingoCellValue = number | 'FREE';
+type BingoCellValue = number | '★';
 
 type BingoPatternKey =
   | 'straight_line'
@@ -528,13 +528,26 @@ function getConfiguredBingoPatterns(roundId: string, count: number, selectedKeys
 }
 
 function parseBingoPatternList(content: string) {
-  const match = content.match(/Patterns to win:\s*([^.]*)/i);
-  if (!match) return [];
+  const keyMatch = content.match(/\[PATTERNS:\s*([^\]]*)\]/i);
+  if (keyMatch) {
+    const patternsFromKeys = keyMatch[1]
+      .split('|')
+      .map((item) => item.trim().toLowerCase() as BingoPatternKey)
+      .map((key) => BINGO_PATTERN_MAP.get(key))
+      .filter(Boolean) as BingoPattern[];
 
-  return match[1]
+    if (patternsFromKeys.length) return patternsFromKeys;
+  }
+
+  const textMatch = content.match(/Patterns to win:\s*(.*?)(?:\.\s+(?:Eligible players|Late joiners|Join using|\[ELIGIBLE|$)|\[ELIGIBLE|$)/i);
+  if (!textMatch) return [];
+
+  return textMatch[1]
     .split(',')
-    .map((item) => item.trim().toLowerCase())
-    .map((label) => BINGO_PATTERN_POOL.find((pattern) => pattern.label.toLowerCase() === label))
+    .map((item) => normalizeText(item))
+    .map((label) =>
+      BINGO_PATTERN_POOL.find((pattern) => normalizeText(pattern.label) === label)
+    )
     .filter(Boolean) as BingoPattern[];
 }
 
@@ -744,6 +757,14 @@ function eventSafeSlug(value: string) {
   return normalizeText(value).replace(/\s+/g, '-').slice(0, 40) || 'player';
 }
 
+function isBingoCenterStar(value: BingoCellValue | unknown) {
+  return value === '★';
+}
+
+function serializeBingoPatternKeys(patterns: BingoPattern[]) {
+  return patterns.map((pattern) => pattern.key).join('|');
+}
+
 function getBingoWinnerMessages(currentMessages: Message[], roundId?: string, startedAt?: string) {
   if (!roundId) return [];
   const startTime = startedAt ? new Date(startedAt).getTime() : 0;
@@ -890,7 +911,7 @@ function generateBingoCard(seedText: string): BingoCellValue[][] {
     );
 
     for (let rowIndex = 0; rowIndex < 5; rowIndex += 1) {
-      card[rowIndex][columnIndex] = columnIndex === 2 && rowIndex === 2 ? 'FREE' : numbers.pop() || column.min;
+      card[rowIndex][columnIndex] = columnIndex === 2 && rowIndex === 2 ? '★' : numbers.pop() || column.min;
     }
   });
 
@@ -1024,7 +1045,7 @@ function getBingoPreviewCells(patternKey: BingoPatternKey) {
 
 function bingoCellIsCovered(card: BingoCellValue[][], row: number, column: number, calledNumbers: Set<number>) {
   const value = card[row]?.[column];
-  return value === 'FREE' || (typeof value === 'number' && calledNumbers.has(value));
+  return isBingoCenterStar(value) || (typeof value === 'number' && calledNumbers.has(value));
 }
 
 function verifyBingoCard(card: BingoCellValue[][], calledNumbers: Set<number>, patterns: BingoPattern[]) {
@@ -1797,7 +1818,7 @@ export default function HomePage() {
 
   function toggleBingoMark(value: BingoCellValue) {
     if (!activeBingoRound || !myName || !isBingoParticipant) return;
-    if (value === 'FREE') return;
+    if (isBingoCenterStar(value)) return;
 
     if (!bingoCalledSet.has(value)) {
       setTemporaryBingoNotice(`${numberToBingoLabel(value)} hindi pa tinatawag ni Jarvis.`);
@@ -1887,7 +1908,7 @@ export default function HomePage() {
 
     window.setTimeout(async () => {
       await insertUniqueEvent(
-        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${quickPatternCount}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
+        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. [PATTERNS: ${serializeBingoPatternKeys(patterns)}] Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${quickPatternCount}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
         JARVIS_NAME,
         `bingo-start-${roundId}`,
         'bingo_start',
@@ -1947,7 +1968,7 @@ export default function HomePage() {
 
     window.setTimeout(async () => {
       await insertUniqueEvent(
-        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${bingoPatternCount}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
+        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. [PATTERNS: ${serializeBingoPatternKeys(patterns)}] Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab, setup your cards, then press Ready. Jarvis will wait before the first call. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${bingoPatternCount}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
         JARVIS_NAME,
         `bingo-start-${roundId}`,
         'bingo_start',
@@ -3427,8 +3448,8 @@ export default function HomePage() {
                     <div className="admin-mini-bingo-card">
                       {['B', 'I', 'N', 'G', 'O'].map((letter) => <strong key={`admin-head-${letter}`}>{letter}</strong>)}
                       {adminPreviewCard.flatMap((row, rowIndex) => row.map((value, columnIndex) => {
-                        const called = value === 'FREE' || (typeof value === 'number' && (bingoTvRound ? new Set(getBingoCalledNumbers(messages, bingoTvRound.roundId)).has(value) : false));
-                        return <span key={`admin-card-${rowIndex}-${columnIndex}`} className={called ? 'called' : ''}>{value === 'FREE' ? '★' : value}</span>;
+                        const called = isBingoCenterStar(value) || (typeof value === 'number' && (bingoTvRound ? new Set(getBingoCalledNumbers(messages, bingoTvRound.roundId)).has(value) : false));
+                        return <span key={`admin-card-${rowIndex}-${columnIndex}`} className={called ? 'called' : ''}>{isBingoCenterStar(value) ? '★' : value}</span>;
                       }))}
                     </div>
                   ) : <small>Start a round or select a player to preview their card.</small>}
@@ -3574,7 +3595,7 @@ export default function HomePage() {
                             ))}
                             {card.flatMap((row, rowIndex) =>
                               row.map((value, columnIndex) => {
-                                const isFree = value === 'FREE';
+                                const isFree = isBingoCenterStar(value);
                                 const isCalled = typeof value === 'number' && bingoCalledSet.has(value);
                                 const isMarked = isFree || (typeof value === 'number' && bingoMarkedSet.has(value));
 
@@ -3586,7 +3607,7 @@ export default function HomePage() {
                                     onClick={() => toggleBingoMark(value)}
                                     disabled={!isCurrentPlayerBingoReady && !isFree}
                                   >
-                                    <span>{value === 'FREE' ? '★' : value}</span>
+                                    <span>{isBingoCenterStar(value) ? '★' : value}</span>
                                   </button>
                                 );
                               })
