@@ -2572,7 +2572,7 @@ export default function HomePage() {
                 <strong>Scan to join</strong>
                 <small>{playerJoinUrl || 'Open the chatroom link'}</small>
               </div>
-              {playerJoinUrl ? <img alt="Chatroom QR code" src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeQrData(playerJoinUrl)}`} /> : null}
+              {playerJoinUrl ? <img alt="Chatroom QR code" src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeQrData(playerJoinUrl)}`} /> : null}
             </div>
           </div>
         </section>

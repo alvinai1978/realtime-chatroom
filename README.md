@@ -85,3 +85,10 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 
 - Moved the BingoTV QR code to the right-side panel under the Winner Verification Report.
 - The QR card now auto-fits inside the fixed 75-inch TV layout.
+
+
+## v14.2
+
+- Fixed BingoTV QR code visibility under the Winner Verification Report.
+- Enlarged the QR code and prevented the Smart TV layout from clipping it.
+- Updated QR generation size for sharper scanning on TV screens.
