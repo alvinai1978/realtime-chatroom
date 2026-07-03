@@ -1127,6 +1127,8 @@ export default function HomePage() {
   const [isBingoTvMode, setIsBingoTvMode] = useState(() => isBingoTvUrl());
   const [bingoTvSyncAt, setBingoTvSyncAt] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [jarvisVoiceEnabled, setJarvisVoiceEnabled] = useState(false);
+  const [liveKitVoiceStatus, setLiveKitVoiceStatus] = useState('Voice off');
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const currentPresenceKeyRef = useRef('');
@@ -1138,6 +1140,8 @@ export default function HomePage() {
   const bingoCalledNumbersRef = useRef<number[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastBingoCallSoundRef = useRef('');
+  const lastJarvisSpokenMessageIdRef = useRef<number | null>(null);
+  const liveKitRoomRef = useRef<{ disconnect: () => void } | null>(null);
   const isBingoTvModeRef = useRef(isBingoTvMode);
 
   const onlineCount = onlineUsers.length;
@@ -1404,6 +1408,94 @@ export default function HomePage() {
     }
     setSoundEnabled(true);
     playToneSequence([{ frequency: 740, start: 0, duration: 0.08, volume: 0.05 }]);
+  }
+
+
+
+  function cleanJarvisVoiceText(value: string) {
+    return value
+      .replace(/[🎱🎮✨🏆🎉🔥⭐✅❌🟢🔴👋🤖📣🔔]/g, ' ')
+      .replace(/\[(PATTERN_KEYS|PRIZE|WINNER_LIMIT|CALL_SPEED|ALLOW_LATE|ELIGIBLE_PLAYERS):[^\]]*\]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 260);
+  }
+
+  function speakJarvisText(text: string, force = false) {
+    if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
+    if (!('speechSynthesis' in window)) {
+      setLiveKitVoiceStatus('Voice not supported by this browser');
+      return;
+    }
+
+    const voiceText = cleanJarvisVoiceText(text);
+    if (!voiceText) return;
+
+    try {
+      const utterance = new SpeechSynthesisUtterance(voiceText);
+      utterance.lang = 'en-PH';
+      utterance.rate = 0.94;
+      utterance.pitch = 0.95;
+      utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.warn('Jarvis voice skipped:', getErrorText(error));
+    }
+  }
+
+  async function connectLiveKitVoiceRoom() {
+    if (typeof window === 'undefined') return;
+
+    try {
+      setLiveKitVoiceStatus('Connecting voice room...');
+      const response = await fetch('/api/livekit-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identity: cleanName(myName || 'BingoTV'),
+          room: `jarvis-${ROOM_NAME}`
+        })
+      });
+
+      const data = (await response.json()) as { token?: string; url?: string; error?: string; details?: string };
+      if (!response.ok || !data.token || !data.url) {
+        throw new Error([data.error, data.details].filter(Boolean).join(' | ') || 'LiveKit token failed.');
+      }
+
+      const { Room, RoomEvent } = await import('livekit-client');
+      liveKitRoomRef.current?.disconnect();
+      const room = new Room({ adaptiveStream: true, dynacast: true });
+      room.on(RoomEvent.Connected, () => setLiveKitVoiceStatus('LiveKit voice connected'));
+      room.on(RoomEvent.Disconnected, () => setLiveKitVoiceStatus('LiveKit voice disconnected'));
+      room.on(RoomEvent.Reconnecting, () => setLiveKitVoiceStatus('LiveKit reconnecting...'));
+      room.on(RoomEvent.Reconnected, () => setLiveKitVoiceStatus('LiveKit voice connected'));
+      await room.connect(data.url, data.token);
+      liveKitRoomRef.current = room;
+      setLiveKitVoiceStatus('LiveKit voice connected');
+    } catch (error) {
+      setLiveKitVoiceStatus(`Local Jarvis voice active. LiveKit: ${getErrorText(error)}`);
+    }
+  }
+
+  function enableJarvisVoice() {
+    if (typeof window === 'undefined') return;
+    lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
+    setJarvisVoiceEnabled(true);
+    setSoundEnabled(true);
+    setLiveKitVoiceStatus('Jarvis voice enabled');
+    speakJarvisText('Jarvis voice is now enabled.', true);
+    void connectLiveKitVoiceRoom();
+  }
+
+  function disableJarvisVoice() {
+    setJarvisVoiceEnabled(false);
+    setLiveKitVoiceStatus('Voice off');
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    liveKitRoomRef.current?.disconnect();
+    liveKitRoomRef.current = null;
   }
 
   function getSoundVolume(key: SoundKey, base: number) {
@@ -2362,6 +2454,35 @@ export default function HomePage() {
     }
   }, []);
 
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      liveKitRoomRef.current?.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!jarvisVoiceEnabled) return;
+    const latestMessage = messages[messages.length - 1];
+    if (!latestMessage || latestMessage.id === lastJarvisSpokenMessageIdRef.current) return;
+
+    const shouldSpeak =
+      latestMessage.user_name === JARVIS_NAME ||
+      latestMessage.event_type === 'bingo_call' ||
+      latestMessage.event_type === 'bingo_winner' ||
+      latestMessage.event_type === 'bingo_invalid' ||
+      latestMessage.event_type === 'bingo_start' ||
+      latestMessage.event_type === 'bingo_end';
+
+    if (!shouldSpeak) return;
+
+    lastJarvisSpokenMessageIdRef.current = latestMessage.id;
+    speakJarvisText(latestMessage.content);
+  }, [messages, jarvisVoiceEnabled]);
+
   useEffect(() => {
     const tvMode = isBingoTvUrl();
     isBingoTvModeRef.current = tvMode;
@@ -3163,7 +3284,11 @@ export default function HomePage() {
             <button type="button" onClick={enableBingoSounds}>
               <Volume2 size={18} /> {soundEnabled ? 'Sounds On' : 'Enable Sounds'}
             </button>
+            <button type="button" onClick={jarvisVoiceEnabled ? disableJarvisVoice : enableJarvisVoice}>
+              {jarvisVoiceEnabled ? <VolumeX size={18} /> : <Volume2 size={18} />} {jarvisVoiceEnabled ? 'Jarvis Voice On' : 'Jarvis Voice'}
+            </button>
             <button type="button" onClick={enterBingoTvFullscreen}>Fullscreen</button>
+            <span className="jarvis-voice-status">{liveKitVoiceStatus}</span>
           </div>
         </section>
       </main>
@@ -3831,6 +3956,9 @@ export default function HomePage() {
                 <Monitor size={17} /> BingoTV
               </button>
             ) : null}
+            <button type="button" className="jarvis-voice-button" onClick={jarvisVoiceEnabled ? disableJarvisVoice : enableJarvisVoice} title={liveKitVoiceStatus}>
+              {jarvisVoiceEnabled ? <VolumeX size={17} /> : <Volume2 size={17} />} {jarvisVoiceEnabled ? 'Voice On' : 'Jarvis Voice'}
+            </button>
             <div className="sender-pill">Logged in as: <strong>{senderName || 'Name required'}</strong>{isAdminUser ? <span className="admin-verified-badge">Admin verified</span> : null}</div>
             {myName ? (
               <button type="button" className="logout-button" onClick={logoutChatroom}>

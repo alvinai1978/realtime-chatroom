@@ -4518,3 +4518,41 @@ button {
     padding: 7px 8px;
   }
 }
+
+/* v15.1 Jarvis LiveKit voice controls */
+.jarvis-voice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.jarvis-voice-button:hover {
+  background: #dbeafe;
+}
+
+.jarvis-voice-status {
+  flex: 1 1 100%;
+  display: block;
+  margin-top: 4px;
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .jarvis-voice-button {
+    flex: 1 1 140px;
+    min-height: 42px;
+    padding: 8px 10px;
+  }
+}
