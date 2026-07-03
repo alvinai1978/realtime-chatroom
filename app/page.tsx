@@ -869,6 +869,23 @@ function verifyBingoCard(card: BingoCellValue[][], calledNumbers: Set<number>, p
   );
 }
 
+function isJarvisBingoStartRequest(message: string) {
+  const normalized = normalizeText(message);
+  if (!normalized.includes('bingo')) return false;
+
+  return (
+    normalized.includes('start') ||
+    normalized.includes('simula') ||
+    normalized.includes('umpisa') ||
+    normalized.includes('host') ||
+    normalized.includes('laro') ||
+    normalized.includes('game') ||
+    normalized.includes('pa bingo') ||
+    normalized.includes('mag bingo') ||
+    normalized === 'bingo'
+  );
+}
+
 export default function HomePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -912,6 +929,7 @@ export default function HomePage() {
   const previousTopScoreRef = useRef<UserScore | null>(null);
   const celebrationTimerRef = useRef<number | null>(null);
   const activeBingoRoundRef = useRef<ActiveBingoRound | null>(null);
+  const pendingBingoStartRef = useRef('');
   const bingoCalledNumbersRef = useRef<number[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastBingoCallSoundRef = useRef('');
@@ -1456,6 +1474,96 @@ export default function HomePage() {
       saveBingoMarks(activeBingoRound.roundId, myName, next);
       return next;
     });
+  }
+
+  async function requestJarvisStartBingoRound(requestedBy: string) {
+    const safeRequester = cleanName(requestedBy || myName || 'Guest');
+
+    if (!myName) {
+      setNameError('Maglagay muna ng participant name bago mag-request ng Bingo kay Jarvis.');
+      return true;
+    }
+
+    enableBingoSounds();
+    setIsBingoOpen(true);
+
+    const currentRound = activeBingoRoundRef.current;
+    if (currentRound) {
+      await insertUniqueEvent(
+        `ℹ️ ${safeRequester} asked Jarvis to start Bingo, but Round ${currentRound.roundId} is already active. Join the current round or wait for the next one.`,
+        JARVIS_NAME,
+        `bingo-request-active-${currentRound.roundId}-${eventSafeSlug(safeRequester)}-${Date.now()}`,
+        'bingo_request',
+        { isAi: true }
+      );
+      setTemporaryBingoNotice('May active Bingo round na. Join current round or wait for next session.');
+      return true;
+    }
+
+    const recentCountdown = [...messagesRef.current].reverse().find((message) => {
+      if (message.event_type !== 'bingo_countdown') return false;
+      return Date.now() - new Date(message.created_at).getTime() < (BINGO_COUNTDOWN_SECONDS + 4) * 1000;
+    });
+
+    if (recentCountdown || pendingBingoStartRef.current) {
+      setTemporaryBingoNotice('Naghahanda na si Jarvis ng Bingo round. Sandali lang.');
+      return true;
+    }
+
+    const roundId = makeRoundId();
+    pendingBingoStartRef.current = roundId;
+    const quickPatternCount = 3;
+    const quickWinnerLimit = 1;
+    const quickCallSpeedMs = BINGO_CALL_INTERVAL_MS;
+    const quickPrizeLabel = 'Jarvis Community Bingo';
+    const patterns = pickBingoPatterns(roundId, quickPatternCount);
+    const patternText = patterns.map((pattern) => pattern.label).join(', ');
+    const eligiblePlayers = Array.from(
+      new Set<string>(
+        userList
+          .map((user) => cleanName(user.name))
+          .filter((name) => name && name !== JARVIS_NAME && name !== 'System')
+      )
+    );
+
+    if (!eligiblePlayers.some((name) => normalizeBingoPlayerName(name) === normalizeBingoPlayerName(safeRequester))) {
+      eligiblePlayers.push(safeRequester);
+    }
+
+    eligiblePlayers.sort((a, b) => a.localeCompare(b));
+    const eligibleText = eligiblePlayers.length ? eligiblePlayers.join(' | ') : safeRequester;
+
+    setBingoCountdown(BINGO_COUNTDOWN_SECONDS);
+    await insertUniqueEvent(
+      `🙋 ${safeRequester} requested a Jarvis-hosted Bingo round. Jarvis will host even without Ripple admin online.`,
+      JARVIS_NAME,
+      `bingo-user-request-${roundId}-${eventSafeSlug(safeRequester)}`,
+      'bingo_request',
+      { isAi: true }
+    );
+
+    await insertUniqueEvent(
+      `⏳ Bingo starts in ${BINGO_COUNTDOWN_SECONDS} seconds! Requested by ${safeRequester}. Prize: ${quickPrizeLabel}. Get ready on your cards. [COUNTDOWN: roundId=${roundId}|seconds=${BINGO_COUNTDOWN_SECONDS}]`,
+      JARVIS_NAME,
+      `bingo-countdown-${roundId}`,
+      'bingo_countdown',
+      { isAi: true }
+    );
+
+    window.setTimeout(async () => {
+      await insertUniqueEvent(
+        `🎱 Jarvis Bingo started by request from ${safeRequester}! Round ${roundId}. Prize: ${quickPrizeLabel}. Winner limit: ${quickWinnerLimit}. Calls every ${formatBingoSeconds(quickCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${quickCallSpeedMs}|winnerLimit=${quickWinnerLimit}|patternCount=${quickPatternCount}|allowLateJoiners=0|prize=${quickPrizeLabel}]`,
+        JARVIS_NAME,
+        `bingo-start-${roundId}`,
+        'bingo_start',
+        { isAi: true }
+      );
+      pendingBingoStartRef.current = '';
+      setBingoCountdown(0);
+      setTemporaryBingoNotice('Jarvis started the Bingo round by user request.');
+    }, BINGO_COUNTDOWN_SECONDS * 1000);
+
+    return true;
   }
 
   async function startBingoRound() {
@@ -2398,7 +2506,12 @@ export default function HomePage() {
       // Save the user's message first, then release the composer immediately.
       // Jarvis replies in the background so users can keep typing while AI is thinking.
       userMessage = await insertMessage(rawMessage, false, activeSender, { eventType: 'user_message' });
-      answeredGame = await tryCongratulateGameWinner(rawMessage, activeSender);
+
+      if (isJarvisBingoStartRequest(rawMessage)) {
+        answeredGame = await requestJarvisStartBingoRound(activeSender);
+      } else {
+        answeredGame = await tryCongratulateGameWinner(rawMessage, activeSender);
+      }
     } catch (error) {
       try {
         await insertMessage(
@@ -2440,7 +2553,7 @@ export default function HomePage() {
       ? 'Connected to live Bingo game'
       : bingoTvRound
         ? 'Showing latest finished Bingo round'
-        : 'Waiting for admin Ripple to start a round';
+        : 'Waiting for Ripple or Jarvis request to start a round';
     const tvLastSyncText = bingoTvSyncAt ? `Synced ${formatTime(bingoTvSyncAt)}` : 'Realtime + auto-refresh ready';
     const playerJoinUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
     const latestCountdown = !bingoTvRound ? [...messages].reverse().find((message) => message.event_type === 'bingo_countdown') : null;
@@ -2450,7 +2563,7 @@ export default function HomePage() {
         <div className="bingo-tv-title-card">
           <p>Jarvis hosted monitor</p>
           <h1>BingoTV</h1>
-          <span>{bingoTvRound ? `Round ${bingoTvRound.roundId}` : 'Waiting for admin Ripple to start a round'}</span>
+          <span>{bingoTvRound ? `Round ${bingoTvRound.roundId}` : 'Waiting for Ripple or Jarvis request to start a round'}</span>
           <div className="bingo-tv-sync-pill">
             <span className={activeBingoRound ? 'connected' : 'standby'} />
             {tvStatusText} • {tvLastSyncText}
@@ -3047,14 +3160,14 @@ export default function HomePage() {
               <div className="bingo-empty">
                 <Gamepad2 size={38} />
                 <h3>No active Bingo round</h3>
-                <p>Start Bingo para si Jarvis muna ang mag-host. Trivia at question games will pause while Bingo is active.</p>
+                <p>Ripple admin can start Bingo, or any user can ask Jarvis to start a community Bingo round. Trivia and question games will pause while Bingo is active.</p>
                 {isAdminUser ? (
                   <button type="button" onClick={startBingoRound}>
                     <Play size={16} /> Start Bingo
                   </button>
                 ) : (
-                  <button type="button" disabled>
-                    Hintayin si Ripple admin
+                  <button type="button" onClick={() => requestJarvisStartBingoRound(senderName || nameDraft || 'Guest')} disabled={!myName}>
+                    <Bot size={16} /> Ask Jarvis to Start Bingo
                   </button>
                 )}
               </div>

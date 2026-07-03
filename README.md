@@ -100,3 +100,11 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - Added mobile Profile button with Profile + Avatar controls and Users list in a separate panel.
 - Added mobile Invite button with QR code in a separate panel.
 - Mobile joined view hides the old sidebar content so the chat screen has more space.
+
+
+## v14.4 Jarvis User-Requested Bingo
+
+- Any normal user can ask Jarvis to start a Bingo game even when Ripple admin is not online.
+- Users can type requests like `Jarvis start bingo`, `start bingo`, `pa start ng bingo`, or press **Ask Jarvis to Start Bingo** in the Bingo panel.
+- Jarvis starts a default community round with 3 winning patterns, 8-second calls, 1 winner limit, and late joiners locked until the next round.
+- Ripple admin controls remain protected by the Ripple password gate; only Ripple can use admin tools, reset controls, BingoTV button, kick/mute, and settings.
