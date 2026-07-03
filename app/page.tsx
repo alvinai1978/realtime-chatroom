@@ -1141,7 +1141,8 @@ export default function HomePage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastBingoCallSoundRef = useRef('');
   const lastJarvisSpokenMessageIdRef = useRef<number | null>(null);
-  const liveKitRoomRef = useRef<{ disconnect: () => void } | null>(null);
+  const liveKitRoomRef = useRef<{ disconnect: () => void; startAudio?: () => Promise<void> } | null>(null);
+  const liveKitAudioContainerRef = useRef<HTMLDivElement | null>(null);
   const isBingoTvModeRef = useRef(isBingoTvMode);
 
   const onlineCount = onlineUsers.length;
@@ -1421,6 +1422,35 @@ export default function HomePage() {
       .slice(0, 260);
   }
 
+  function attachLiveKitAudioTrack(track: { kind?: string; attach?: () => HTMLElement }) {
+    if (track.kind !== 'audio' || !track.attach || !liveKitAudioContainerRef.current) return;
+
+    try {
+      const element = track.attach();
+      element.setAttribute('data-jarvis-livekit-audio', '1');
+      element.setAttribute('playsinline', 'true');
+      (element as HTMLMediaElement).autoplay = true;
+      liveKitAudioContainerRef.current.appendChild(element);
+
+      const maybeAudio = element as HTMLAudioElement;
+      if (typeof maybeAudio.play === 'function') {
+        void maybeAudio.play().catch(() => {
+          setLiveKitVoiceStatus('Tap Jarvis Voice again to allow LiveKit audio');
+        });
+      }
+    } catch (error) {
+      console.warn('Could not attach LiveKit audio:', getErrorText(error));
+    }
+  }
+
+  function detachLiveKitAudioTrack(track: { detach?: () => HTMLElement[] }) {
+    try {
+      track.detach?.().forEach((element) => element.remove());
+    } catch (error) {
+      console.warn('Could not detach LiveKit audio:', getErrorText(error));
+    }
+  }
+
   function getJarvisMaleTagalogVoice() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
 
@@ -1466,6 +1496,11 @@ export default function HomePage() {
 
   function speakJarvisText(text: string, force = false) {
     if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
+
+    // When the LiveKit Agent is connected, the real server-side TTS agent speaks the message.
+    // Browser speech is used only as a fallback/test voice so there is no double audio.
+    if (!liveKitVoiceStatus.toLowerCase().includes('fallback') && liveKitRoomRef.current && !force) return;
+
     if (!('speechSynthesis' in window)) {
       setLiveKitVoiceStatus('Voice not supported by this browser');
       return;
@@ -1492,7 +1527,7 @@ export default function HomePage() {
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
     } catch (error) {
-      console.warn('Jarvis voice skipped:', getErrorText(error));
+      console.warn('Jarvis fallback voice skipped:', getErrorText(error));
     }
   }
 
@@ -1517,16 +1552,27 @@ export default function HomePage() {
 
       const { Room, RoomEvent } = await import('livekit-client');
       liveKitRoomRef.current?.disconnect();
+      liveKitAudioContainerRef.current?.querySelectorAll('[data-jarvis-livekit-audio]').forEach((element) => element.remove());
+
       const room = new Room({ adaptiveStream: true, dynacast: true });
-      room.on(RoomEvent.Connected, () => setLiveKitVoiceStatus('LiveKit voice connected'));
+      room.on(RoomEvent.Connected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Jarvis Voice Agent'));
       room.on(RoomEvent.Disconnected, () => setLiveKitVoiceStatus('LiveKit voice disconnected'));
       room.on(RoomEvent.Reconnecting, () => setLiveKitVoiceStatus('LiveKit reconnecting...'));
-      room.on(RoomEvent.Reconnected, () => setLiveKitVoiceStatus('LiveKit voice connected'));
+      room.on(RoomEvent.Reconnected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Jarvis Voice Agent'));
+      room.on(RoomEvent.TrackSubscribed, (track) => {
+        attachLiveKitAudioTrack(track as { kind?: string; attach?: () => HTMLElement });
+        if ((track as { kind?: string }).kind === 'audio') setLiveKitVoiceStatus('LiveKit Agent voice active');
+      });
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        detachLiveKitAudioTrack(track as { detach?: () => HTMLElement[] });
+      });
+
       await room.connect(data.url, data.token);
       liveKitRoomRef.current = room;
-      setLiveKitVoiceStatus('LiveKit voice connected');
+      await room.startAudio?.();
+      setLiveKitVoiceStatus('LiveKit connected. Start/run Jarvis Voice Agent');
     } catch (error) {
-      setLiveKitVoiceStatus(`Local Jarvis voice active. LiveKit: ${getErrorText(error)}`);
+      setLiveKitVoiceStatus(`Browser fallback active. LiveKit: ${getErrorText(error)}`);
     }
   }
 
@@ -1539,8 +1585,8 @@ export default function HomePage() {
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
-    setLiveKitVoiceStatus('Jarvis male Tagalog voice enabled');
-    speakJarvisText('Naka on na ang boses ni Jarvis. Lalaking boses ako at Tagalog ang tono.', true);
+    setLiveKitVoiceStatus('Connecting to LiveKit Jarvis Voice Agent...');
+    speakJarvisText('Naka on na ang Jarvis Voice. Kapag tumatakbo ang LiveKit Agent, tunay na server voice ang maririnig ninyo.', true);
     void connectLiveKitVoiceRoom();
   }
 

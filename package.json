@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "latest",
-    "livekit-client": "^2.20.0",
-    "livekit-server-sdk": "^2.16.0",
+    "livekit-client": "latest",
+    "livekit-server-sdk": "latest",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",

@@ -4556,3 +4556,13 @@ button {
     padding: 8px 10px;
   }
 }
+
+/* v15.3 LiveKit Agent audio elements */
+.livekit-audio-layer {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

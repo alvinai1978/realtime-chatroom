@@ -177,3 +177,38 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - The included LiveKit token route prepares the app for a LiveKit voice room. A separate LiveKit Agent/TTS worker can join the same room later for true server-side Jarvis voice.
 - The current app also uses browser SpeechSynthesis so Jarvis can speak immediately on the device where voice is enabled.
 - Keep `LIVEKIT_API_SECRET` only in `.env.local` and Vercel Environment Variables. Do not commit or paste it in client files.
+
+## v15.3 Real LiveKit Jarvis Voice Agent
+
+This update adds a separate `jarvis-voice-agent/` worker. The browser connects to LiveKit and subscribes to remote agent audio, while the agent itself speaks Jarvis/Bingo messages using LiveKit Agents + LiveKit Inference TTS.
+
+Files added:
+
+```text
+jarvis-voice-agent/package.json
+jarvis-voice-agent/src/agent.ts
+jarvis-voice-agent/.env.example
+jarvis-voice-agent/README.md
+```
+
+Run the voice agent separately:
+
+```powershell
+cd D:\realtime-chatroom\jarvis-voice-agent
+npm install
+copy .env.example .env
+notepad .env
+npm run connect
+```
+
+Then open the app or BingoTV and click `Jarvis Voice` once to allow audio playback.
+
+## v15.4 Jarvis Tagalog Agent Speech Fix
+
+The `jarvis-voice-agent` now rewrites Jarvis/Bingo messages into Tagalog/Taglish before speaking through LiveKit TTS. Bingo calls are spoken in Filipino style, for example: `Bi, labing dalawa. Ulitin ko, Bi, labing dalawa.` Countdown, winner reports, invalid claims, and Bingo start/end messages are also converted to Tagalog-friendly speech.
+
+Set this in `jarvis-voice-agent/.env`:
+
+```env
+JARVIS_FORCE_TAGALOG=true
+```
