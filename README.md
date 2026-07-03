@@ -1,52 +1,29 @@
-# Realtime Chatroom Jarvis v13.6
+# Realtime Chatroom Jarvis v13.7
 
-Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, and Jarvis-hosted Bingo.
+BingoTV 75-inch fixed layout hard fix.
 
-## New in v13.6
+## Fix in v13.7
 
-- BingoTV layout redesigned to match a 75-inch Smart TV monitor view.
-- BingoTV now fits the whole 16:9 screen without page scrollbar on TV/desktop resolutions.
-- Layout is split into: left host/title/patterns/stats, center latest calls/master board, and right animated current call/winner verification report.
-- Current Bingo call remains colorful and animated.
-- Master board, 3 patterns, latest calls, eligible players, call count, and winner report stay visible at the same time.
+- BingoTV no longer depends on `display: contents`, which can fail on some Smart TV browsers.
+- TV screen now uses direct grid sections for Title, Latest Calls, Big Call Number, Patterns, Master Board, Stats, and Winner Verification.
+- Main TV screen is forced to one-screen 16:9 fit on desktop/Smart TV sizes.
+- The full page scrollbar is hidden on TV layout; panels auto-compress text and board cells.
 
-## Admin
-
-- Admin name: `Ripple`
-- Admin password: `rip123`
-- Only verified Ripple can see BingoTV and admin controls.
-
-## Local setup
-
-Create `.env.local` or `.env`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-NVIDIA_API_KEY=your-nvidia-api-key
-NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL=meta/llama-3.1-8b-instruct
-```
-
-Run:
-
-```bash
-npm install
-npm run dev
-```
-
-Open:
+## Replace files
 
 ```text
-http://localhost:3000
+page.tsx     -> app/page.tsx
+globals.css  -> app/globals.css
+README.md    -> README.md
 ```
 
 ## Deploy
 
 ```bash
 git add app/page.tsx app/globals.css README.md
-git commit -m "Improve BingoTV 75 inch monitor layout"
+git commit -m "Fix BingoTV 75 inch fixed layout"
 git push
 vercel --prod
 ```
+
+After deploy, open BingoTV, hard refresh, then click Fullscreen.

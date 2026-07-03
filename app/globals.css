@@ -2925,3 +2925,403 @@ button {
     -webkit-line-clamp: 2;
   }
 }
+
+/* v13.7 BingoTV HARD FIX: direct-grid Smart TV layout, no display:contents dependency */
+@media (min-width: 900px) and (min-height: 500px) {
+  html,
+  body {
+    overflow: hidden;
+  }
+
+  .bingo-tv-shell.bingo-tv-fixed-shell {
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    display: grid !important;
+    grid-template-columns: minmax(260px, 26.5vw) minmax(430px, 43.5vw) minmax(280px, 30vw) !important;
+    grid-template-rows: minmax(76px, 17dvh) minmax(0, 50dvh) minmax(0, 33dvh) !important;
+    grid-template-areas:
+      "tvtitle tvstrip tvcall"
+      "tvpatterns tvboard tvcall"
+      "tvstats tvboard tvreport" !important;
+    gap: clamp(5px, 0.55vw, 10px) !important;
+    overflow: hidden !important;
+    padding: clamp(5px, 0.6vw, 11px) !important;
+    background:
+      radial-gradient(circle at 82% 18%, rgba(124, 58, 237, 0.28), transparent 34%),
+      radial-gradient(circle at 8% 12%, rgba(14, 165, 233, 0.24), transparent 32%),
+      #07111f !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-title-card {
+    grid-area: tvtitle !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: clamp(10px, 0.9vw, 18px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-title-card p {
+    margin: 0 !important;
+    font-size: clamp(0.62rem, 0.85vw, 1rem) !important;
+    letter-spacing: 0.25em !important;
+    white-space: nowrap !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-title-card h1 {
+    margin: clamp(2px, 0.35vw, 6px) 0 0 !important;
+    font-size: clamp(2.6rem, 5.2vw, 6rem) !important;
+    line-height: 0.82 !important;
+    letter-spacing: -0.08em !important;
+    white-space: nowrap !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-title-card > span {
+    display: block !important;
+    margin-top: clamp(4px, 0.45vw, 8px) !important;
+    font-size: clamp(0.78rem, 1.05vw, 1.3rem) !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-sync-pill {
+    max-width: 100% !important;
+    margin-top: clamp(5px, 0.55vw, 9px) !important;
+    padding: 5px 9px !important;
+    font-size: clamp(0.56rem, 0.76vw, 0.9rem) !important;
+    line-height: 1.05 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-live-strip {
+    grid-area: tvstrip !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: 1.1fr 0.42fr 1.18fr !important;
+    gap: clamp(4px, 0.42vw, 8px) !important;
+    margin: 0 !important;
+    padding: clamp(6px, 0.58vw, 10px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-live-strip > div {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: clamp(5px, 0.5vw, 9px) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-live-strip strong,
+  .bingo-tv-fixed-shell .bingo-tv-panel-title span {
+    margin-bottom: 4px !important;
+    font-size: clamp(0.52rem, 0.68vw, 0.82rem) !important;
+    line-height: 1.05 !important;
+    letter-spacing: 0.11em !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-recent-calls {
+    gap: clamp(3px, 0.34vw, 6px) !important;
+    max-height: calc(100% - 16px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-recent-calls span,
+  .bingo-tv-fixed-shell .bingo-tv-next-call,
+  .bingo-tv-fixed-shell .bingo-tv-event-text {
+    min-height: clamp(20px, 2.7dvh, 30px) !important;
+    padding: 3px 7px !important;
+    font-size: clamp(0.55rem, 0.78vw, 0.95rem) !important;
+    line-height: 1 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-live-card {
+    grid-area: tvcall !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    align-content: center !important;
+    gap: clamp(6px, 0.65vw, 12px) !important;
+    padding: clamp(8px, 0.8vw, 16px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-live-card span.live,
+  .bingo-tv-fixed-shell .bingo-tv-live-card span.idle {
+    padding: 5px 12px !important;
+    font-size: clamp(0.56rem, 0.75vw, 0.95rem) !important;
+    line-height: 1 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-orb {
+    width: min(22vw, 34dvh, 320px) !important;
+    height: min(22vw, 34dvh, 320px) !important;
+    min-width: 135px !important;
+    min-height: 135px !important;
+    margin: 0 auto !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-orb em {
+    font-size: clamp(0.95rem, 1.45vw, 1.8rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-orb strong {
+    font-size: clamp(3.6rem, 7.6vw, 8rem) !important;
+    line-height: 0.86 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-live-card small {
+    font-size: clamp(0.72rem, 1.05vw, 1.25rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-progress {
+    width: min(92%, 360px) !important;
+    height: clamp(6px, 0.9dvh, 10px) !important;
+    margin-top: 0 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-pattern-panel {
+    grid-area: tvpatterns !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-panel {
+    grid-area: tvboard !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-report-panel {
+    grid-area: tvreport !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-side-panel {
+    grid-area: tvstats !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: clamp(6px, 0.62vw, 12px) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-panel-title {
+    margin-bottom: clamp(4px, 0.45vw, 8px) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-panel-title small {
+    font-size: clamp(0.46rem, 0.58vw, 0.72rem) !important;
+    line-height: 1 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-pattern-list {
+    height: calc(100% - 26px) !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: repeat(3, minmax(0, 1fr)) !important;
+    gap: clamp(4px, 0.45vw, 8px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-pattern-card {
+    min-height: 0 !important;
+    height: 100% !important;
+    display: grid !important;
+    align-items: center !important;
+    grid-template-columns: clamp(42px, 4vw, 70px) minmax(0, 1fr) !important;
+    gap: clamp(5px, 0.52vw, 9px) !important;
+    padding: clamp(5px, 0.5vw, 9px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .pattern-mini-grid.tv {
+    width: clamp(38px, 3.7vw, 64px) !important;
+    height: clamp(38px, 3.7vw, 64px) !important;
+    gap: 2px !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-pattern-card strong {
+    display: block !important;
+    font-size: clamp(0.72rem, 0.95vw, 1.18rem) !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-pattern-card p {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    margin-top: 2px !important;
+    font-size: clamp(0.48rem, 0.66vw, 0.82rem) !important;
+    line-height: 1.18 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-master-board {
+    flex: 1 1 auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: clamp(2px, 0.28vw, 5px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-column {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: clamp(20px, 3dvh, 38px) repeat(15, minmax(0, 1fr)) !important;
+    gap: clamp(1px, 0.24vw, 4px) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-column strong,
+  .bingo-tv-fixed-shell .bingo-tv-column span {
+    min-height: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    border-radius: clamp(4px, 0.5vw, 9px) !important;
+    line-height: 1 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-column strong {
+    font-size: clamp(0.9rem, 1.65vw, 2.05rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-column span {
+    font-size: clamp(0.46rem, 0.72vw, 0.96rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-column span.latest {
+    transform: scale(1.08) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-report-stack {
+    height: calc(100% - 26px) !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: repeat(4, minmax(0, 1fr)) !important;
+    gap: clamp(4px, 0.45vw, 8px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-report {
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: clamp(5px, 0.55vw, 10px) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-report strong {
+    font-size: clamp(0.58rem, 0.72vw, 0.9rem) !important;
+    line-height: 1 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-report p {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    font-size: clamp(0.5rem, 0.66vw, 0.82rem) !important;
+    line-height: 1.16 !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-report small {
+    font-size: clamp(0.48rem, 0.62vw, 0.76rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-stat-grid {
+    height: calc(100% - 38px) !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: clamp(4px, 0.45vw, 8px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-stat-grid div {
+    min-height: 0 !important;
+    padding: clamp(5px, 0.55vw, 10px) !important;
+    overflow: hidden !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-stat-grid span {
+    font-size: clamp(0.48rem, 0.6vw, 0.78rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-stat-grid strong {
+    font-size: clamp(0.9rem, 1.45vw, 1.85rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-actions {
+    margin-top: clamp(4px, 0.48vw, 8px) !important;
+    gap: clamp(4px, 0.42vw, 7px) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-actions button {
+    min-height: clamp(24px, 3.4dvh, 36px) !important;
+    padding: 5px 8px !important;
+    font-size: clamp(0.52rem, 0.66vw, 0.82rem) !important;
+  }
+
+  .bingo-tv-fixed-shell *::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+@media (min-width: 900px) and (min-height: 500px) and (max-height: 720px) {
+  .bingo-tv-shell.bingo-tv-fixed-shell {
+    grid-template-rows: minmax(68px, 16dvh) minmax(0, 51dvh) minmax(0, 33dvh) !important;
+    gap: 5px !important;
+    padding: 5px !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-title-card h1 {
+    font-size: clamp(2.25rem, 4.45vw, 5rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-title-card p {
+    font-size: clamp(0.52rem, 0.72vw, 0.82rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-sync-pill {
+    margin-top: 4px !important;
+    padding: 4px 8px !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-orb {
+    width: min(19vw, 30dvh, 245px) !important;
+    height: min(19vw, 30dvh, 245px) !important;
+    min-width: 125px !important;
+    min-height: 125px !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-call-orb strong {
+    font-size: clamp(3rem, 6.2vw, 6.7rem) !important;
+  }
+
+  .bingo-tv-fixed-shell .bingo-tv-pattern-card p,
+  .bingo-tv-fixed-shell .bingo-tv-report p {
+    -webkit-line-clamp: 2 !important;
+  }
+}
+
+@media (max-width: 899px), (max-height: 499px) {
+  .bingo-tv-shell.bingo-tv-fixed-shell {
+    overflow: auto !important;
+  }
+}

@@ -1875,30 +1875,16 @@ export default function HomePage() {
     const tvLastSyncText = bingoTvSyncAt ? `Synced ${formatTime(bingoTvSyncAt)}` : 'Realtime + auto-refresh ready';
 
     return (
-      <main className="bingo-tv-shell">
-        <section className="bingo-tv-hero">
-          <div className="bingo-tv-title-card">
-            <p>Jarvis hosted monitor</p>
-            <h1>BingoTV</h1>
-            <span>{bingoTvRound ? `Round ${bingoTvRound.roundId}` : 'Waiting for admin Ripple to start a round'}</span>
-            <div className="bingo-tv-sync-pill">
-              <span className={activeBingoRound ? 'connected' : 'standby'} />
-              {tvStatusText} • {tvLastSyncText}
-            </div>
+      <main className="bingo-tv-shell bingo-tv-fixed-shell">
+        <div className="bingo-tv-title-card">
+          <p>Jarvis hosted monitor</p>
+          <h1>BingoTV</h1>
+          <span>{bingoTvRound ? `Round ${bingoTvRound.roundId}` : 'Waiting for admin Ripple to start a round'}</span>
+          <div className="bingo-tv-sync-pill">
+            <span className={activeBingoRound ? 'connected' : 'standby'} />
+            {tvStatusText} • {tvLastSyncText}
           </div>
-
-          <div className={`bingo-tv-live-card ${latestTvBingoCall ? 'has-call' : 'standby'}`} key={`tv-call-${latestTvBingoCall || 'standby'}-${bingoTvCalledNumbers.length}`}>
-            <span className={activeBingoRound ? 'live' : 'idle'}>{activeBingoRound ? 'LIVE ROUND' : bingoTvRound ? 'LAST ROUND' : 'STANDBY'}</span>
-            <div className="bingo-tv-call-orb" aria-label={latestTvBingoCall ? `Latest call ${latestTvBingoLabel}` : 'No Bingo call yet'}>
-              <em>{latestTvBingoCall ? latestTvLetter : 'BINGO'}</em>
-              <strong>{latestTvBingoCall ? latestTvNumberText : '--'}</strong>
-            </div>
-            <small>Bingo Call #{bingoTvCalledNumbers.length || 0}</small>
-            <div className="bingo-tv-call-progress" style={{ '--progress': `${tvCallProgress}%` } as CSSProperties}>
-              <span />
-            </div>
-          </div>
-        </section>
+        </div>
 
         <section className="bingo-tv-live-strip">
           <div>
@@ -1919,118 +1905,128 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="bingo-tv-dashboard">
-          <div className="bingo-tv-panel bingo-tv-pattern-panel">
-            <div className="bingo-tv-panel-title">
-              <span>3 Patterns to Win</span>
-              <small>Official round patterns</small>
-            </div>
-            {bingoTvRound ? (
-              <div className="bingo-tv-pattern-list">
-                {bingoTvRound.patterns.map((pattern) => {
-                  const previewCells = getBingoPreviewCells(pattern.key);
+        <div className={`bingo-tv-live-card ${latestTvBingoCall ? 'has-call' : 'standby'}`} key={`tv-call-${latestTvBingoCall || 'standby'}-${bingoTvCalledNumbers.length}`}>
+          <span className={activeBingoRound ? 'live' : 'idle'}>{activeBingoRound ? 'LIVE ROUND' : bingoTvRound ? 'LAST ROUND' : 'STANDBY'}</span>
+          <div className="bingo-tv-call-orb" aria-label={latestTvBingoCall ? `Latest call ${latestTvBingoLabel}` : 'No Bingo call yet'}>
+            <em>{latestTvBingoCall ? latestTvLetter : 'BINGO'}</em>
+            <strong>{latestTvBingoCall ? latestTvNumberText : '--'}</strong>
+          </div>
+          <small>Bingo Call #{bingoTvCalledNumbers.length || 0}</small>
+          <div className="bingo-tv-call-progress" style={{ '--progress': `${tvCallProgress}%` } as CSSProperties}>
+            <span />
+          </div>
+        </div>
 
+        <section className="bingo-tv-panel bingo-tv-pattern-panel">
+          <div className="bingo-tv-panel-title">
+            <span>3 Patterns to Win</span>
+            <small>Official round patterns</small>
+          </div>
+          {bingoTvRound ? (
+            <div className="bingo-tv-pattern-list">
+              {bingoTvRound.patterns.map((pattern) => {
+                const previewCells = getBingoPreviewCells(pattern.key);
+
+                return (
+                  <article key={`tv-${pattern.key}`} className="bingo-tv-pattern-card">
+                    <div className="pattern-mini-grid tv" aria-hidden="true">
+                      {Array.from({ length: 25 }, (_, index) => {
+                        const row = Math.floor(index / 5);
+                        const column = index % 5;
+                        const isCenter = row === 2 && column === 2;
+                        return (
+                          <span
+                            key={`tv-${pattern.key}-${index}`}
+                            className={previewCells.has(`${row}-${column}`) || isCenter ? 'needed' : ''}
+                          >
+                            {isCenter ? 'F' : ''}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div>
+                      <strong>{pattern.label}</strong>
+                      <p>{pattern.description}</p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="bingo-tv-muted">No active Bingo round yet.</p>
+          )}
+        </section>
+
+        <section className="bingo-tv-panel bingo-tv-call-panel">
+          <div className="bingo-tv-panel-title">
+            <span>Master Called Numbers</span>
+            <small>{activeBingoRound ? 'Live master board from user Bingo games' : 'Synced from latest Bingo round'}</small>
+          </div>
+          <div className="bingo-tv-master-board">
+            {BINGO_COLUMNS.map((column) => (
+              <div key={`tv-col-${column.letter}`} className="bingo-tv-column">
+                <strong>{column.letter}</strong>
+                {Array.from({ length: 15 }, (_, index) => column.min + index).map((number) => {
+                  const isCalled = calledNumberSet.has(number);
+                  const isLatest = latestTvBingoCall === number;
                   return (
-                    <article key={`tv-${pattern.key}`} className="bingo-tv-pattern-card">
-                      <div className="pattern-mini-grid tv" aria-hidden="true">
-                        {Array.from({ length: 25 }, (_, index) => {
-                          const row = Math.floor(index / 5);
-                          const column = index % 5;
-                          const isCenter = row === 2 && column === 2;
-                          return (
-                            <span
-                              key={`tv-${pattern.key}-${index}`}
-                              className={previewCells.has(`${row}-${column}`) || isCenter ? 'needed' : ''}
-                            >
-                              {isCenter ? 'F' : ''}
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <div>
-                        <strong>{pattern.label}</strong>
-                        <p>{pattern.description}</p>
-                      </div>
-                    </article>
+                    <span key={`tv-number-${number}`} className={`${isCalled ? 'called' : ''} ${isLatest ? 'latest' : ''}`}>
+                      {number}
+                    </span>
                   );
                 })}
               </div>
-            ) : (
-              <p className="bingo-tv-muted">No active Bingo round yet.</p>
-            )}
+            ))}
           </div>
+        </section>
 
-          <div className="bingo-tv-panel bingo-tv-call-panel">
-            <div className="bingo-tv-panel-title">
-              <span>Master Called Numbers</span>
-              <small>{activeBingoRound ? 'Live master board from user Bingo games' : 'Synced from latest Bingo round'}</small>
-            </div>
-            <div className="bingo-tv-master-board">
-              {BINGO_COLUMNS.map((column) => (
-                <div key={`tv-col-${column.letter}`} className="bingo-tv-column">
-                  <strong>{column.letter}</strong>
-                  {Array.from({ length: 15 }, (_, index) => column.min + index).map((number) => {
-                    const isCalled = calledNumberSet.has(number);
-                    const isLatest = latestTvBingoCall === number;
-                    return (
-                      <span key={`tv-number-${number}`} className={`${isCalled ? 'called' : ''} ${isLatest ? 'latest' : ''}`}>
-                        {number}
-                      </span>
-                    );
-                  })}
+        <section className="bingo-tv-panel bingo-tv-report-panel">
+          <div className="bingo-tv-panel-title">
+            <span>Winner Verification Report</span>
+            <small>Jarvis checks claims vs. official called list</small>
+          </div>
+          {latestBingoVerification ? (
+            <div className="bingo-tv-report-stack">
+              {bingoVerificationMessages.slice(-4).reverse().map((verification) => (
+                <div key={verification.id} className={`bingo-tv-report ${verification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
+                  <strong>{verification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
+                  <p>{verification.content}</p>
+                  <small>{formatTime(verification.created_at)}</small>
                 </div>
               ))}
             </div>
-          </div>
+          ) : (
+            <div className="bingo-tv-report pending">
+              <strong>No winner yet</strong>
+              <p>Kapag may user na pumindot ng BINGO, lalabas dito ang verification result ni Jarvis.</p>
+            </div>
+          )}
+        </section>
 
-          <div className="bingo-tv-panel bingo-tv-report-panel">
-            <div className="bingo-tv-panel-title">
-              <span>Winner Verification Report</span>
-              <small>Jarvis checks claims vs. official called list</small>
+        <section className="bingo-tv-panel bingo-tv-side-panel">
+          <div className="bingo-tv-stat-grid">
+            <div>
+              <span>Players Online</span>
+              <strong>{onlineCount}</strong>
             </div>
-            {latestBingoVerification ? (
-              <div className="bingo-tv-report-stack">
-                {bingoVerificationMessages.slice(-4).reverse().map((verification) => (
-                  <div key={verification.id} className={`bingo-tv-report ${verification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
-                    <strong>{verification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
-                    <p>{verification.content}</p>
-                    <small>{formatTime(verification.created_at)}</small>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bingo-tv-report pending">
-                <strong>No winner yet</strong>
-                <p>Kapag may user na pumindot ng BINGO, lalabas dito ang verification result ni Jarvis.</p>
-              </div>
-            )}
+            <div>
+              <span>Eligible Players</span>
+              <strong>{bingoTvRound?.eligiblePlayers.length || 0}</strong>
+            </div>
+            <div>
+              <span>Numbers Called</span>
+              <strong>{bingoTvCalledNumbers.length}/75</strong>
+            </div>
+            <div>
+              <span>Winner Score</span>
+              <strong>+{BINGO_WIN_SCORE}</strong>
+            </div>
           </div>
-
-          <div className="bingo-tv-panel bingo-tv-side-panel">
-            <div className="bingo-tv-stat-grid">
-              <div>
-                <span>Players Online</span>
-                <strong>{onlineCount}</strong>
-              </div>
-              <div>
-                <span>Eligible Players</span>
-                <strong>{bingoTvRound?.eligiblePlayers.length || 0}</strong>
-              </div>
-              <div>
-                <span>Numbers Called</span>
-                <strong>{bingoTvCalledNumbers.length}/75</strong>
-              </div>
-              <div>
-                <span>Winner Score</span>
-                <strong>+{BINGO_WIN_SCORE}</strong>
-              </div>
-            </div>
-            <div className="bingo-tv-actions">
-              <button type="button" onClick={enableBingoSounds}>
-                <Volume2 size={18} /> {soundEnabled ? 'Sounds On' : 'Enable Sounds'}
-              </button>
-              <button type="button" onClick={enterBingoTvFullscreen}>Fullscreen</button>
-            </div>
+          <div className="bingo-tv-actions">
+            <button type="button" onClick={enableBingoSounds}>
+              <Volume2 size={18} /> {soundEnabled ? 'Sounds On' : 'Enable Sounds'}
+            </button>
+            <button type="button" onClick={enterBingoTvFullscreen}>Fullscreen</button>
           </div>
         </section>
       </main>
