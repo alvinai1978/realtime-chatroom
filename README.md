@@ -96,3 +96,11 @@ Manual deploy option:
 ```bash
 vercel --prod
 ```
+
+## v13.4 BingoTV sync and Smart TV update
+
+- BingoTV now has an auto-refresh safety sync every 2.5 seconds, so the separate TV monitor stays connected to the same Supabase Bingo events used by the player Bingo screens.
+- BingoTV no longer runs the Jarvis host loop or posts join/left activity; it acts as a pure monitor screen.
+- Current Bingo call now has a colorful animated call orb, animated latest-number highlight on the master board, and recent-call strip.
+- BingoTV layout has better Smart TV auto-fit for 75-inch/large 16:9 displays, with scroll fallback for smaller TVs and browser zoom differences.
+- BingoTV shows connection/sync status, latest Jarvis Bingo event, next hidden call, patterns, called numbers, eligible players, and verification reports.

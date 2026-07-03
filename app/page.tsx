@@ -191,6 +191,13 @@ function isAdminUserName(name: string) {
   return ADMIN_NAMES.has(cleanName(name).toLowerCase());
 }
 
+function isBingoTvUrl() {
+  if (typeof window === 'undefined') return false;
+
+  const params = new URLSearchParams(window.location.search);
+  return params.get('bingoTV') === '1' || params.get('view') === 'bingo-tv';
+}
+
 function sanitizeParticipantName(name: string) {
   return name
     .trim()
@@ -648,7 +655,8 @@ export default function HomePage() {
   const [bingoMarkedNumbers, setBingoMarkedNumbers] = useState<number[]>([]);
   const [bingoNotice, setBingoNotice] = useState('');
   const [bingoMarkColor, setBingoMarkColor] = useState('blue');
-  const [isBingoTvMode, setIsBingoTvMode] = useState(false);
+  const [isBingoTvMode, setIsBingoTvMode] = useState(() => isBingoTvUrl());
+  const [bingoTvSyncAt, setBingoTvSyncAt] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -660,6 +668,7 @@ export default function HomePage() {
   const bingoCalledNumbersRef = useRef<number[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastBingoCallSoundRef = useRef('');
+  const isBingoTvModeRef = useRef(isBingoTvMode);
 
   const onlineCount = onlineUsers.length;
   const senderName = myName;
@@ -708,6 +717,15 @@ export default function HomePage() {
   }, [messages, bingoTvRound?.roundId, bingoTvRound?.startedAt]);
 
   const latestBingoVerification = bingoVerificationMessages[bingoVerificationMessages.length - 1] || null;
+  const latestBingoTvMessage = useMemo(() => {
+    if (!bingoTvRound) return null;
+    const startedAt = new Date(bingoTvRound.startedAt).getTime();
+
+    return [...messages].reverse().find((message) => {
+      const messageTime = new Date(message.created_at).getTime();
+      return messageTime >= startedAt && Boolean(message.event_type?.startsWith('bingo_'));
+    }) || null;
+  }, [messages, bingoTvRound?.roundId, bingoTvRound?.startedAt]);
 
   const canJoinActiveBingo = useMemo(
     () => Boolean(activeBingoRound && myName && isBingoEligiblePlayer(activeBingoRound, myName)),
@@ -849,7 +867,7 @@ export default function HomePage() {
     enableBingoSounds();
     const tvUrl = new URL(window.location.href);
     tvUrl.searchParams.set('bingoTV', '1');
-    window.open(tvUrl.toString(), 'jarvis-bingo-tv', 'popup=yes,width=1366,height=768');
+    window.open(tvUrl.toString(), 'jarvis-bingo-tv', 'popup=yes,width=1920,height=1080');
   }
 
   function enterBingoTvFullscreen() {
@@ -1223,21 +1241,63 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tvMode = params.get('bingoTV') === '1' || params.get('view') === 'bingo-tv';
+    const tvMode = isBingoTvUrl();
+    isBingoTvModeRef.current = tvMode;
     setIsBingoTvMode(tvMode);
-    if (tvMode) document.title = 'Jarvis BingoTV';
+    if (tvMode) document.title = 'Jarvis BingoTV - Live Monitor';
   }, []);
 
   useEffect(() => {
-    if (!activeBingoRound?.roundId || !latestBingoCall) return;
+    isBingoTvModeRef.current = isBingoTvMode;
+  }, [isBingoTvMode]);
 
-    const callKey = `${activeBingoRound.roundId}:${bingoCalledNumbers.length}:${latestBingoCall}`;
+  useEffect(() => {
+    if (!isBingoTvMode) return;
+
+    let cancelled = false;
+
+    async function refreshBingoTvSnapshot() {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('room', ROOM_NAME)
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (!cancelled && !error && data) {
+        setMessages([...(data as Message[])].reverse());
+        setBingoTvSyncAt(new Date().toISOString());
+      }
+
+      if (!cancelled) {
+        await loadScores();
+      }
+    }
+
+    void refreshBingoTvSnapshot();
+    const tvRefreshTimer = window.setInterval(refreshBingoTvSnapshot, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(tvRefreshTimer);
+    };
+  }, [isBingoTvMode]);
+
+  useEffect(() => {
+    const soundRound = isBingoTvMode ? bingoTvRound : activeBingoRound;
+    const soundCall = isBingoTvMode
+      ? (bingoTvCalledNumbers.length ? bingoTvCalledNumbers[bingoTvCalledNumbers.length - 1] : null)
+      : latestBingoCall;
+    const soundCount = isBingoTvMode ? bingoTvCalledNumbers.length : bingoCalledNumbers.length;
+
+    if (!soundRound?.roundId || !soundCall) return;
+
+    const callKey = `${soundRound.roundId}:${soundCount}:${soundCall}`;
     if (lastBingoCallSoundRef.current === callKey) return;
 
     lastBingoCallSoundRef.current = callKey;
     playBingoCallSound();
-  }, [activeBingoRound?.roundId, latestBingoCall, bingoCalledNumbers.length, soundEnabled]);
+  }, [activeBingoRound?.roundId, bingoTvRound?.roundId, latestBingoCall, bingoCalledNumbers.length, bingoTvCalledNumbers.length, isBingoTvMode, soundEnabled]);
 
   useEffect(() => {
     if (!myName || !channelRef.current) return;
@@ -1276,10 +1336,10 @@ export default function HomePage() {
         .from('messages')
         .select('*')
         .eq('room', ROOM_NAME)
-        .order('created_at', { ascending: true })
-        .limit(250);
+        .order('created_at', { ascending: false })
+        .limit(300);
 
-      if (!error && data) setMessages(data as Message[]);
+      if (!error && data) setMessages([...(data as Message[])].reverse());
     }
 
     loadMessages();
@@ -1320,6 +1380,8 @@ export default function HomePage() {
         const joinPayload = payload as { key: string; newPresences?: Array<Record<string, unknown>> };
         const joinedUsers = Array.isArray(joinPayload.newPresences) ? joinPayload.newPresences : [];
 
+        if (isBingoTvModeRef.current) return;
+
         joinedUsers.forEach((presence) => {
           const name = cleanName(String(presence.user_name || 'Guest'));
           postJoinMessages(joinPayload.key, name);
@@ -1328,6 +1390,8 @@ export default function HomePage() {
       .on('presence', { event: 'leave' }, (payload) => {
         const leavePayload = payload as { key: string; leftPresences?: Array<Record<string, unknown>> };
         const leftUsers = Array.isArray(leavePayload.leftPresences) ? leavePayload.leftPresences : [];
+
+        if (isBingoTvModeRef.current) return;
 
         leftUsers.forEach((presence) => {
           const name = cleanName(String(presence.user_name || 'Guest'));
@@ -1351,6 +1415,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const runJarvisHostLoop = () => {
+      if (isBingoTvModeRef.current) return;
+
       if (activeBingoRoundRef.current) {
         void postNextBingoCall();
         return;
@@ -1746,19 +1812,59 @@ export default function HomePage() {
     const nextTvCall = bingoTvRound ? callOrder[bingoTvCalledNumbers.length] || null : null;
     const calledNumberSet = new Set(bingoTvCalledNumbers);
     const latestTvBingoCall = bingoTvCalledNumbers.length ? bingoTvCalledNumbers[bingoTvCalledNumbers.length - 1] : null;
+    const latestTvBingoLabel = latestTvBingoCall ? numberToBingoLabel(latestTvBingoCall) : '--';
+    const [latestTvLetter = '', latestTvNumberText = '--'] = latestTvBingoLabel.split('-');
+    const recentTvCalls = bingoTvCalledNumbers.slice(-10).reverse();
+    const tvCallProgress = Math.round((bingoTvCalledNumbers.length / 75) * 100);
+    const tvStatusText = activeBingoRound
+      ? 'Connected to live Bingo game'
+      : bingoTvRound
+        ? 'Showing latest finished Bingo round'
+        : 'Waiting for admin Ripple to start a round';
+    const tvLastSyncText = bingoTvSyncAt ? `Synced ${formatTime(bingoTvSyncAt)}` : 'Realtime + auto-refresh ready';
 
     return (
       <main className="bingo-tv-shell">
         <section className="bingo-tv-hero">
-          <div>
+          <div className="bingo-tv-title-card">
             <p>Jarvis hosted monitor</p>
             <h1>BingoTV</h1>
             <span>{bingoTvRound ? `Round ${bingoTvRound.roundId}` : 'Waiting for admin Ripple to start a round'}</span>
+            <div className="bingo-tv-sync-pill">
+              <span className={activeBingoRound ? 'connected' : 'standby'} />
+              {tvStatusText} • {tvLastSyncText}
+            </div>
           </div>
-          <div className="bingo-tv-live-card">
+
+          <div className={`bingo-tv-live-card ${latestTvBingoCall ? 'has-call' : 'standby'}`} key={`tv-call-${latestTvBingoCall || 'standby'}-${bingoTvCalledNumbers.length}`}>
             <span className={activeBingoRound ? 'live' : 'idle'}>{activeBingoRound ? 'LIVE ROUND' : bingoTvRound ? 'LAST ROUND' : 'STANDBY'}</span>
-            <strong>{latestTvBingoCall ? numberToBingoLabel(latestTvBingoCall) : '--'}</strong>
+            <div className="bingo-tv-call-orb" aria-label={latestTvBingoCall ? `Latest call ${latestTvBingoLabel}` : 'No Bingo call yet'}>
+              <em>{latestTvBingoCall ? latestTvLetter : 'BINGO'}</em>
+              <strong>{latestTvBingoCall ? latestTvNumberText : '--'}</strong>
+            </div>
             <small>Bingo Call #{bingoTvCalledNumbers.length || 0}</small>
+            <div className="bingo-tv-call-progress" style={{ '--progress': `${tvCallProgress}%` } as CSSProperties}>
+              <span />
+            </div>
+          </div>
+        </section>
+
+        <section className="bingo-tv-live-strip">
+          <div>
+            <strong>Latest calls</strong>
+            <div className="bingo-tv-recent-calls">
+              {recentTvCalls.length ? recentTvCalls.map((number) => (
+                <span key={`recent-tv-call-${number}`} className={number === latestTvBingoCall ? 'latest' : ''}>{numberToBingoLabel(number)}</span>
+              )) : <span className="empty">No calls yet</span>}
+            </div>
+          </div>
+          <div>
+            <strong>Next call</strong>
+            <span className="bingo-tv-next-call">{nextTvCall ? numberToBingoLabel(nextTvCall) : activeBingoRound ? 'Final call reached' : 'Hidden until live'}</span>
+          </div>
+          <div>
+            <strong>Latest Jarvis event</strong>
+            <span className="bingo-tv-event-text">{latestBingoTvMessage ? latestBingoTvMessage.content : 'No Bingo event yet'}</span>
           </div>
         </section>
 
@@ -1806,7 +1912,7 @@ export default function HomePage() {
           <div className="bingo-tv-panel bingo-tv-call-panel">
             <div className="bingo-tv-panel-title">
               <span>Master Called Numbers</span>
-              <small>{nextTvCall ? `Next hidden draw: ${numberToBingoLabel(nextTvCall)}` : 'Auto-hosted by Jarvis'}</small>
+              <small>{activeBingoRound ? 'Live master board from user Bingo games' : 'Synced from latest Bingo round'}</small>
             </div>
             <div className="bingo-tv-master-board">
               {BINGO_COLUMNS.map((column) => (
@@ -1832,10 +1938,14 @@ export default function HomePage() {
               <small>Jarvis checks claims vs. official called list</small>
             </div>
             {latestBingoVerification ? (
-              <div className={`bingo-tv-report ${latestBingoVerification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
-                <strong>{latestBingoVerification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
-                <p>{latestBingoVerification.content}</p>
-                <small>{formatTime(latestBingoVerification.created_at)}</small>
+              <div className="bingo-tv-report-stack">
+                {bingoVerificationMessages.slice(-4).reverse().map((verification) => (
+                  <div key={verification.id} className={`bingo-tv-report ${verification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
+                    <strong>{verification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
+                    <p>{verification.content}</p>
+                    <small>{formatTime(verification.created_at)}</small>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="bingo-tv-report pending">

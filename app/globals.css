@@ -2067,3 +2067,423 @@ button {
     height: 58px;
   }
 }
+
+/* v13.4 BingoTV realtime sync, colorful call animation, and Smart TV auto-fit */
+.bingo-tv-shell {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: auto;
+  padding: clamp(12px, 1.4vw, 24px);
+}
+
+.bingo-tv-title-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.bingo-tv-title-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -12% -45% 48%;
+  width: 50%;
+  height: 90%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.22), transparent 68%);
+  animation: tvGlowFloat 6s ease-in-out infinite alternate;
+}
+
+.bingo-tv-sync-pill {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 9px;
+  margin-top: clamp(10px, 1.1vw, 16px) !important;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.58);
+  color: #dbeafe !important;
+  padding: 9px 13px;
+  font-size: clamp(0.74rem, 0.95vw, 0.96rem) !important;
+  font-weight: 950 !important;
+}
+
+.bingo-tv-sync-pill span {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  margin: 0 !important;
+}
+
+.bingo-tv-sync-pill span.connected {
+  background: #22c55e;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.9);
+}
+
+.bingo-tv-sync-pill span.standby {
+  background: #f59e0b;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.72);
+}
+
+.bingo-tv-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, clamp(300px, 26vw, 480px));
+  gap: clamp(10px, 1.1vw, 18px);
+  margin-bottom: clamp(10px, 1.1vw, 16px);
+}
+
+.bingo-tv-hero > div:first-child,
+.bingo-tv-live-card,
+.bingo-tv-panel,
+.bingo-tv-live-strip {
+  border-color: rgba(148, 163, 184, 0.34);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.82), rgba(30, 41, 59, 0.62));
+}
+
+.bingo-tv-hero > div:first-child {
+  padding: clamp(16px, 1.7vw, 28px);
+}
+
+.bingo-tv-hero h1 {
+  font-size: clamp(3rem, 6.2vw, 6.7rem);
+}
+
+.bingo-tv-live-card {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(14px, 1.6vw, 24px);
+}
+
+.bingo-tv-live-card::before,
+.bingo-tv-live-card::after {
+  content: "";
+  position: absolute;
+  inset: -28%;
+  border-radius: 999px;
+  opacity: 0.42;
+  background: conic-gradient(from 0deg, #38bdf8, #a78bfa, #f472b6, #facc15, #22c55e, #38bdf8);
+  animation: tvCallSpin 7s linear infinite;
+}
+
+.bingo-tv-live-card::after {
+  inset: 8%;
+  opacity: 0.18;
+  filter: blur(18px);
+  animation-direction: reverse;
+}
+
+.bingo-tv-live-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.bingo-tv-live-card span.live,
+.bingo-tv-live-card span.idle {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.bingo-tv-call-orb {
+  width: min(24vw, 265px);
+  height: min(24vw, 265px);
+  min-width: 150px;
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  margin: clamp(10px, 1.2vw, 18px) auto 6px;
+  border: 5px solid rgba(255, 255, 255, 0.78);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.98), rgba(250, 204, 21, 0.96) 34%, rgba(249, 115, 22, 0.92) 72%),
+    #facc15;
+  color: #111827;
+  box-shadow:
+    0 0 0 10px rgba(250, 204, 21, 0.13),
+    0 0 48px rgba(250, 204, 21, 0.72),
+    inset 0 -20px 44px rgba(124, 45, 18, 0.22);
+  animation: tvCallPop 0.72s cubic-bezier(.2, 1.35, .35, 1), tvCallPulse 1.8s ease-in-out 0.75s infinite;
+}
+
+.bingo-tv-call-orb em {
+  display: block;
+  margin: 0;
+  color: #7c2d12;
+  font-style: normal;
+  font-size: clamp(1.1rem, 2vw, 2rem);
+  font-weight: 1000;
+  line-height: 1;
+  letter-spacing: 0.16em;
+}
+
+.bingo-tv-call-orb strong {
+  display: block;
+  margin: 0;
+  color: #111827;
+  font-size: clamp(4.5rem, 9vw, 8.6rem) !important;
+  line-height: 0.86;
+  text-shadow: 0 4px 0 rgba(255, 255, 255, 0.34);
+}
+
+.bingo-tv-live-card.standby .bingo-tv-call-orb {
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  animation: none;
+}
+
+.bingo-tv-call-progress {
+  width: min(100%, 360px);
+  height: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+}
+
+.bingo-tv-call-progress span {
+  display: block;
+  width: var(--progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #38bdf8, #a78bfa, #facc15);
+  transition: width 0.45s ease;
+}
+
+.bingo-tv-live-strip {
+  display: grid;
+  grid-template-columns: 1.1fr 0.5fr 1.25fr;
+  gap: clamp(8px, 1vw, 14px);
+  margin-bottom: clamp(10px, 1.1vw, 16px);
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: clamp(18px, 1.7vw, 28px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.20);
+  padding: clamp(10px, 1.1vw, 16px);
+}
+
+.bingo-tv-live-strip > div {
+  min-width: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: clamp(9px, 1vw, 13px);
+}
+
+.bingo-tv-live-strip strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #93c5fd;
+  font-size: clamp(0.72rem, 0.9vw, 0.9rem);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bingo-tv-recent-calls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bingo-tv-recent-calls span,
+.bingo-tv-next-call,
+.bingo-tv-event-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #e2e8f0;
+  padding: 6px 10px;
+  font-size: clamp(0.78rem, 1vw, 0.95rem);
+  font-weight: 950;
+}
+
+.bingo-tv-recent-calls span.latest {
+  background: #facc15;
+  color: #111827;
+  animation: tvLatestChip 1.2s ease-in-out infinite;
+}
+
+.bingo-tv-recent-calls span.empty {
+  color: #94a3b8;
+}
+
+.bingo-tv-event-text {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 16px;
+}
+
+.bingo-tv-dashboard {
+  grid-template-columns: minmax(270px, 0.82fr) minmax(440px, 1.58fr);
+  grid-template-areas:
+    "patterns calls"
+    "report calls"
+    "side calls";
+  gap: clamp(10px, 1vw, 18px);
+  height: auto;
+  min-height: 0;
+}
+
+.bingo-tv-panel {
+  padding: clamp(12px, 1.05vw, 18px);
+  overflow: auto;
+}
+
+.bingo-tv-call-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: min(64dvh, 680px);
+}
+
+.bingo-tv-master-board {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  gap: clamp(5px, 0.65vw, 10px);
+}
+
+.bingo-tv-column {
+  grid-template-rows: clamp(34px, 4.3vh, 56px) repeat(15, minmax(24px, 1fr));
+  gap: clamp(4px, 0.55vw, 7px);
+}
+
+.bingo-tv-column strong,
+.bingo-tv-column span {
+  border-radius: clamp(8px, 0.85vw, 14px);
+}
+
+.bingo-tv-column strong {
+  font-size: clamp(1.2rem, 2.6vw, 2.5rem);
+}
+
+.bingo-tv-column span {
+  font-size: clamp(0.78rem, 1.15vw, 1.32rem);
+  transition: transform 0.24s ease, background 0.24s ease, color 0.24s ease, box-shadow 0.24s ease;
+}
+
+.bingo-tv-column span.called {
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.42), rgba(124, 58, 237, 0.34));
+}
+
+.bingo-tv-column span.latest {
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(145deg, #facc15, #fb7185, #38bdf8);
+  color: #111827;
+  transform: scale(1.12);
+  animation: tvBoardLatest 1.1s ease-in-out infinite alternate;
+}
+
+.bingo-tv-report-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.bingo-tv-report-panel {
+  max-height: clamp(168px, 24dvh, 265px);
+}
+
+.bingo-tv-pattern-list {
+  gap: clamp(6px, 0.8vw, 10px);
+}
+
+.bingo-tv-pattern-card {
+  grid-template-columns: clamp(56px, 5.1vw, 82px) 1fr;
+  gap: clamp(8px, 0.9vw, 14px);
+  padding: clamp(8px, 0.85vw, 12px);
+}
+
+.pattern-mini-grid.tv {
+  width: clamp(52px, 4.6vw, 72px);
+  height: clamp(52px, 4.6vw, 72px);
+}
+
+@keyframes tvCallSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes tvCallPop {
+  0% { transform: scale(0.42) rotate(-18deg); opacity: 0; }
+  60% { transform: scale(1.08) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes tvCallPulse {
+  0%, 100% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0.13), 0 0 48px rgba(250, 204, 21, 0.72), inset 0 -20px 44px rgba(124, 45, 18, 0.22); }
+  50% { box-shadow: 0 0 0 18px rgba(250, 204, 21, 0.08), 0 0 74px rgba(244, 114, 182, 0.52), inset 0 -20px 44px rgba(124, 45, 18, 0.22); }
+}
+
+@keyframes tvBoardLatest {
+  from { box-shadow: 0 0 22px rgba(250, 204, 21, 0.36); }
+  to { box-shadow: 0 0 44px rgba(56, 189, 248, 0.48); }
+}
+
+@keyframes tvLatestChip {
+  50% { transform: translateY(-2px) scale(1.04); }
+}
+
+@keyframes tvGlowFloat {
+  to { transform: translate(-24px, -16px) scale(1.12); }
+}
+
+@media (min-width: 1500px) and (min-height: 820px) {
+  .bingo-tv-shell {
+    overflow: hidden;
+  }
+
+  .bingo-tv-dashboard {
+    height: calc(100dvh - clamp(252px, 25dvh, 300px));
+  }
+
+  .bingo-tv-call-panel {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 1280px), (max-height: 760px) {
+  .bingo-tv-shell {
+    overflow: auto;
+  }
+
+  .bingo-tv-live-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .bingo-tv-dashboard {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "calls"
+      "patterns"
+      "report"
+      "side";
+  }
+
+  .bingo-tv-call-panel {
+    min-height: 620px;
+  }
+
+  .bingo-tv-master-board {
+    min-height: 510px;
+  }
+}
+
+@media (max-width: 720px) {
+  .bingo-tv-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .bingo-tv-call-orb {
+    width: 180px;
+    height: 180px;
+  }
+
+  .bingo-tv-call-panel {
+    min-height: 580px;
+  }
+
+  .bingo-tv-master-board {
+    min-height: 480px;
+  }
+}
