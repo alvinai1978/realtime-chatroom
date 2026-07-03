@@ -1,8 +1,8 @@
-# Realtime Chatroom Jarvis v15.2
+# Realtime Chatroom Jarvis v15.7
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, at Jarvis-hosted Bingo.
 
-## New in v15.2
+## New in v15.7
 
 - Full Ripple-only Admin Control Panel.
 - Admin buttons: Start Bingo, End Bingo, Reset Calls, Reset Scores display, Kick User, Mute/Unmute User, Clear Chat, and View Winners.
@@ -25,8 +25,8 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - Animated Bingo number draw machine on BingoTV.
 - User Profile + Avatar + profile color.
 - Jarvis Voice button with browser speech output for Jarvis messages and Bingo calls.
-- Jarvis browser speech now prefers a male Tagalog/Filipino voice when available.
-- Jarvis fallback speech uses `fil-PH`, slower rate, and lower pitch for a more male Tagalog-style delivery.
+- Jarvis browser speech now uses English-style Bingo call reading.
+- Jarvis fallback speech uses `en-US`, steady rate, and lower pitch for a clearer English-style delivery.
 - LiveKit voice-room token endpoint at `app/api/livekit-token/route.ts`.
 - LiveKit credentials stay server-side in environment variables; never place API secret in browser code.
 
@@ -212,3 +212,35 @@ Set this in `jarvis-voice-agent/.env`:
 ```env
 JARVIS_FORCE_TAGALOG=true
 ```
+
+
+## v15.5 Voice Agent Env Fix
+
+- The Jarvis voice agent now passes LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET directly into WorkerOptions.
+- Added clearer missing-env error messages for the local voice agent.
+- Fixed TypeScript typing in jarvis-voice-agent/src/agent.ts so the agent folder can build separately.
+
+Run the agent from the correct folder:
+
+```powershell
+cd D:\realtime-chatroom\jarvis-voice-agent
+npm install
+npm run connect
+```
+
+
+## v15.6 Browser Voice Called Numbers Fix
+
+- LiveKit voice is no longer forced for Bingo speech because browser/device audio is more reliable for the current setup.
+- The **Jarvis Voice** button now activates local browser speech and keeps reading every official Bingo called number.
+- Bingo calls are spoken in Tagalog style, for example: `Tawag bilang isa. Bi, labing dalawa. Ulitin ko, Bi, labing dalawa.`
+- When voice is enabled during an active round, Jarvis also reads the latest called number so the host/player can confirm audio is working.
+- The optional `jarvis-voice-agent/` folder may remain in the project, but it is no longer required for called-number speech.
+
+
+## v15.7 English Voice Called Numbers
+
+- Changed Jarvis browser voice from Tagalog-style to English-style Bingo reading.
+- Example call: `Call number one. B, twelve. I repeat, B, twelve. Mark it if it is on your card.`
+- Countdown, Bingo start, reset calls, winner, and invalid claim voice lines are now English-friendly.
+- Browser voice now prefers English voices when available and falls back to `en-US`.

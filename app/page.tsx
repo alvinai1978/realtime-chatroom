@@ -863,6 +863,55 @@ function numberToBingoLabel(number: number) {
   return `${column?.letter || '?'}-${number}`;
 }
 
+function numberToEnglishSpeech(number: number) {
+  const belowTwenty: Record<number, string> = {
+    0: 'zero',
+    1: 'one',
+    2: 'two',
+    3: 'three',
+    4: 'four',
+    5: 'five',
+    6: 'six',
+    7: 'seven',
+    8: 'eight',
+    9: 'nine',
+    10: 'ten',
+    11: 'eleven',
+    12: 'twelve',
+    13: 'thirteen',
+    14: 'fourteen',
+    15: 'fifteen',
+    16: 'sixteen',
+    17: 'seventeen',
+    18: 'eighteen',
+    19: 'nineteen'
+  };
+  const tens: Record<number, string> = {
+    20: 'twenty',
+    30: 'thirty',
+    40: 'forty',
+    50: 'fifty',
+    60: 'sixty',
+    70: 'seventy'
+  };
+
+  if (number < 20) return belowTwenty[number] || String(number);
+
+  const tensPart = Math.floor(number / 10) * 10;
+  const onesPart = number % 10;
+  const tensText = tens[tensPart] || String(tensPart);
+
+  if (!onesPart) return tensText;
+  return `${tensText} ${belowTwenty[onesPart]}`;
+}
+
+function numberToBingoVoiceLabel(number: number) {
+  const label = numberToBingoLabel(number);
+  const letter = label.charAt(0).toUpperCase();
+  const letterSpeech: Record<string, string> = { B: 'B', I: 'I', N: 'N', G: 'G', O: 'O' };
+  return `${letterSpeech[letter] || letter}, ${numberToEnglishSpeech(number)}`;
+}
+
 function parseBingoCallNumber(content: string) {
   const match = content.match(/([BINGO])-\s*(\d{1,2})/i);
   if (!match) return null;
@@ -1415,10 +1464,54 @@ export default function HomePage() {
 
   function cleanJarvisVoiceText(value: string) {
     return value
-      .replace(/[🎱🎮✨🏆🎉🔥⭐✅❌🟢🔴👋🤖📣🔔]/g, ' ')
-      .replace(/\[(PATTERN_KEYS|PRIZE|WINNER_LIMIT|CALL_SPEED|ALLOW_LATE|ELIGIBLE_PLAYERS):[^\]]*\]/gi, ' ')
+      .replace(/[🎱🎮✨🏆🎉🔥⭐✅❌🟢🔴👋🤖📣🔔⏳]/g, ' ')
+      .replace(/\[(PATTERN_KEYS|PRIZE|WINNER_LIMIT|CALL_SPEED|ALLOW_LATE|ELIGIBLE_PLAYERS|COUNTDOWN|PATTERNS|ELIGIBLE|SETTINGS):[^\]]*\]/gi, ' ')
       .replace(/\s+/g, ' ')
-      .trim()
+      .trim();
+  }
+
+  function buildJarvisSpeechText(value: string) {
+    const bingoCallMatch = value.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
+    if (bingoCallMatch) {
+      const callCount = bingoCallMatch[1] ? Number(bingoCallMatch[1]) : null;
+      const number = Number(bingoCallMatch[3]);
+      const voiceLabel = numberToBingoVoiceLabel(number);
+      const callPrefix = callCount ? `Call number ${numberToEnglishSpeech(callCount)}. ` : '';
+      return `${callPrefix}${voiceLabel}. I repeat, ${voiceLabel}. Mark it if it is on your card.`;
+    }
+
+    const compact = cleanJarvisVoiceText(value);
+    if (!compact) return '';
+
+    if (/Bingo starts in/i.test(compact)) {
+      const seconds = Number(compact.match(/Bingo starts in\s*(\d+)/i)?.[1] || BINGO_COUNTDOWN_SECONDS);
+      return `Bingo starts in ${numberToEnglishSpeech(seconds)} seconds. Please get your cards ready.`;
+    }
+
+    if (/Jarvis Bingo started/i.test(compact)) {
+      return 'Bingo has started. Listen to every called number and mark only the official calls.';
+    }
+
+    if (/reset the called numbers/i.test(compact)) {
+      return 'The called numbers have been reset. Jarvis will start again from the first call.';
+    }
+
+    if (/All 75 numbers were called/i.test(compact)) {
+      return 'The Bingo round is over. All seventy five numbers have been called.';
+    }
+
+    if (/BINGO verified/i.test(compact)) {
+      const winner = compact.match(/Winner #\d+:\s*([^ ]+)/i)?.[1] || 'player';
+      return `Bingo verified. ${winner} wins. Congratulations.`;
+    }
+
+    if (/not valid|invalid|Hindi pa valid/i.test(compact)) {
+      return 'The Bingo claim is not valid yet. It is missing official called numbers.';
+    }
+
+    return compact
+      .replace(/Bingo Call #(\d+):/gi, 'Call number $1:')
+      .replace(/called numbers/gi, 'called numbers')
       .slice(0, 260);
   }
 
@@ -1451,13 +1544,13 @@ export default function HomePage() {
     }
   }
 
-  function getJarvisMaleTagalogVoice() {
+  function getJarvisMaleEnglishVoice() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
 
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
 
-    const tagalogHints = ['fil', 'tl', 'ph', 'tagalog', 'filipino', 'philippines'];
+    const englishHints = ['en-us', 'en-gb', 'en-au', 'en-ca', 'english', 'united states', 'united kingdom'];
     const maleNameHints = [
       'male',
       'man',
@@ -1471,7 +1564,10 @@ export default function HomePage() {
       'alex',
       'fred',
       'ralph',
-      'thomas'
+      'thomas',
+      'microsoft guy',
+      'google uk english male',
+      'google us english'
     ];
     const femaleNameHints = ['female', 'woman', 'girl', 'zira', 'hazel', 'susan', 'samantha', 'victoria', 'karen'];
 
@@ -1479,9 +1575,8 @@ export default function HomePage() {
       const label = `${voice.name} ${voice.lang} ${voice.voiceURI}`.toLowerCase();
       let score = 0;
 
-      if (tagalogHints.some((hint) => label.includes(hint))) score += 80;
-      if (voice.lang.toLowerCase().startsWith('fil') || voice.lang.toLowerCase().startsWith('tl')) score += 60;
-      if (voice.lang.toLowerCase().includes('ph')) score += 45;
+      if (voice.lang.toLowerCase().startsWith('en')) score += 90;
+      if (englishHints.some((hint) => label.includes(hint))) score += 45;
       if (maleNameHints.some((hint) => label.includes(hint))) score += 25;
       if (femaleNameHints.some((hint) => label.includes(hint))) score -= 45;
       if (voice.localService) score += 5;
@@ -1497,31 +1592,30 @@ export default function HomePage() {
   function speakJarvisText(text: string, force = false) {
     if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
 
-    // When the LiveKit Agent is connected, the real server-side TTS agent speaks the message.
-    // Browser speech is used only as a fallback/test voice so there is no double audio.
-    if (!liveKitVoiceStatus.toLowerCase().includes('fallback') && liveKitRoomRef.current && !force) return;
+    // v15.7: use the reliable local browser voice for English Bingo called numbers.
+    // LiveKit agent is optional and no longer blocks Jarvis from reading the calls.
 
     if (!('speechSynthesis' in window)) {
       setLiveKitVoiceStatus('Voice not supported by this browser');
       return;
     }
 
-    const voiceText = cleanJarvisVoiceText(text);
+    const voiceText = buildJarvisSpeechText(text);
     if (!voiceText) return;
 
     try {
-      const selectedVoice = getJarvisMaleTagalogVoice();
+      const selectedVoice = getJarvisMaleEnglishVoice();
       const utterance = new SpeechSynthesisUtterance(voiceText);
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
-        utterance.lang = selectedVoice.lang || 'fil-PH';
+        utterance.lang = selectedVoice.lang || 'en-US';
       } else {
-        utterance.lang = 'fil-PH';
+        utterance.lang = 'en-US';
       }
 
-      // Lower pitch + slower pace gives Jarvis a more male, Tagalog-friendly delivery.
-      utterance.rate = 0.86;
+      // Lower pitch + steady pace gives Jarvis a clearer male English-style delivery.
+      utterance.rate = 0.9;
       utterance.pitch = 0.72;
       utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
       window.speechSynthesis.cancel();
@@ -1585,9 +1679,15 @@ export default function HomePage() {
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
-    setLiveKitVoiceStatus('Connecting to LiveKit Jarvis Voice Agent...');
-    speakJarvisText('Naka on na ang Jarvis Voice. Kapag tumatakbo ang LiveKit Agent, tunay na server voice ang maririnig ninyo.', true);
-    void connectLiveKitVoiceRoom();
+    liveKitRoomRef.current?.disconnect();
+    liveKitRoomRef.current = null;
+    setLiveKitVoiceStatus('Browser voice active. Jarvis will read the called numbers.');
+    speakJarvisText('Jarvis Voice is on. I will read the called numbers in English.', true);
+
+    const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
+    if (latestBingoCall) {
+      window.setTimeout(() => speakJarvisText(`Last call: ${latestBingoCall.content}`, true), 900);
+    }
   }
 
   function disableJarvisVoice() {
