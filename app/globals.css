@@ -1632,3 +1632,438 @@ button {
     width: 100%;
   }
 }
+
+/* v13.3 BingoTV monitor, admin controls, and sound buttons */
+.bingo-tv-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 10px 14px;
+  font-size: 0.84rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.bingo-tv-button:hover {
+  background: #e0e7ff;
+}
+
+.bingo-tv-shell {
+  min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(59, 130, 246, 0.42), transparent 34%),
+    radial-gradient(circle at 90% 18%, rgba(124, 58, 237, 0.38), transparent 30%),
+    linear-gradient(135deg, #07111f 0%, #0f172a 56%, #111827 100%);
+  color: #f8fafc;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.bingo-tv-hero {
+  display: grid;
+  grid-template-columns: 1fr minmax(260px, 360px);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.bingo-tv-hero > div:first-child,
+.bingo-tv-live-card,
+.bingo-tv-panel {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.70);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px);
+}
+
+.bingo-tv-hero > div:first-child {
+  border-radius: 32px;
+  padding: 26px 30px;
+}
+
+.bingo-tv-hero p,
+.bingo-tv-hero h1,
+.bingo-tv-hero span {
+  margin: 0;
+}
+
+.bingo-tv-hero p {
+  color: #93c5fd;
+  font-size: clamp(0.82rem, 1.2vw, 1rem);
+  font-weight: 1000;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.bingo-tv-hero h1 {
+  margin-top: 6px;
+  font-size: clamp(3.4rem, 7vw, 7rem);
+  line-height: 0.94;
+  letter-spacing: -0.07em;
+}
+
+.bingo-tv-hero span {
+  display: block;
+  margin-top: 12px;
+  color: #cbd5e1;
+  font-size: clamp(1rem, 1.5vw, 1.35rem);
+  font-weight: 800;
+}
+
+.bingo-tv-live-card {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border-radius: 32px;
+  padding: 22px;
+  text-align: center;
+}
+
+.bingo-tv-live-card span {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 1000;
+  letter-spacing: 0.14em;
+}
+
+.bingo-tv-live-card span.live {
+  background: rgba(34, 197, 94, 0.17);
+  color: #86efac;
+}
+
+.bingo-tv-live-card span.idle {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+}
+
+.bingo-tv-live-card strong {
+  margin-top: 14px;
+  font-size: clamp(3.2rem, 8vw, 6rem);
+  line-height: 1;
+  color: #facc15;
+  text-shadow: 0 0 28px rgba(250, 204, 21, 0.24);
+}
+
+.bingo-tv-live-card small {
+  margin-top: 6px;
+  color: #cbd5e1;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.bingo-tv-dashboard {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.95fr) minmax(520px, 1.55fr);
+  grid-template-areas:
+    "patterns calls"
+    "report calls"
+    "side calls";
+  gap: 18px;
+  height: calc(100dvh - 210px);
+  min-height: 520px;
+}
+
+.bingo-tv-panel {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 18px;
+}
+
+.bingo-tv-pattern-panel { grid-area: patterns; }
+.bingo-tv-call-panel { grid-area: calls; }
+.bingo-tv-report-panel { grid-area: report; }
+.bingo-tv-side-panel { grid-area: side; }
+
+.bingo-tv-panel-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.bingo-tv-panel-title span {
+  color: #ffffff;
+  font-size: clamp(1rem, 1.7vw, 1.32rem);
+  font-weight: 1000;
+  letter-spacing: -0.02em;
+}
+
+.bingo-tv-panel-title small,
+.bingo-tv-muted {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.bingo-tv-pattern-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bingo-tv-pattern-card {
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 12px;
+}
+
+.bingo-tv-pattern-card strong,
+.bingo-tv-pattern-card p {
+  margin: 0;
+}
+
+.bingo-tv-pattern-card strong {
+  font-size: clamp(1rem, 1.5vw, 1.28rem);
+}
+
+.bingo-tv-pattern-card p {
+  margin-top: 4px;
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.pattern-mini-grid.tv {
+  width: 72px;
+  height: 72px;
+  gap: 4px;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.pattern-mini-grid.tv span {
+  min-height: 0;
+}
+
+.bingo-tv-master-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  height: calc(100% - 44px);
+}
+
+.bingo-tv-column {
+  display: grid;
+  grid-template-rows: 48px repeat(15, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.bingo-tv-column strong,
+.bingo-tv-column span {
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  font-weight: 1000;
+}
+
+.bingo-tv-column strong {
+  background: linear-gradient(145deg, #2563eb, #7c3aed);
+  color: #fff;
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  letter-spacing: 0.08em;
+}
+
+.bingo-tv-column span {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: clamp(0.92rem, 1.6vw, 1.35rem);
+}
+
+.bingo-tv-column span.called {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(147, 197, 253, 0.58);
+  color: #dbeafe;
+}
+
+.bingo-tv-column span.latest {
+  background: #facc15;
+  border-color: #fde68a;
+  color: #111827;
+  box-shadow: 0 0 32px rgba(250, 204, 21, 0.36);
+  transform: scale(1.04);
+}
+
+.bingo-tv-report {
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.bingo-tv-report.valid {
+  border-color: rgba(34, 197, 94, 0.54);
+  background: rgba(22, 163, 74, 0.16);
+}
+
+.bingo-tv-report.invalid {
+  border-color: rgba(248, 113, 113, 0.54);
+  background: rgba(220, 38, 38, 0.15);
+}
+
+.bingo-tv-report.pending {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.10);
+}
+
+.bingo-tv-report strong,
+.bingo-tv-report p,
+.bingo-tv-report small {
+  display: block;
+  margin: 0;
+}
+
+.bingo-tv-report strong {
+  color: #f8fafc;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+}
+
+.bingo-tv-report p {
+  margin-top: 8px;
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+
+.bingo-tv-report small {
+  margin-top: 10px;
+  color: #94a3b8;
+  font-weight: 900;
+}
+
+.bingo-tv-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bingo-tv-stat-grid div {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 13px;
+}
+
+.bingo-tv-stat-grid span,
+.bingo-tv-stat-grid strong {
+  display: block;
+}
+
+.bingo-tv-stat-grid span {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.bingo-tv-stat-grid strong {
+  margin-top: 4px;
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+.bingo-tv-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.bingo-tv-actions button {
+  flex: 1 1 0;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 1000;
+}
+
+.bingo-tv-actions button:last-child {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.26);
+}
+
+@media (max-width: 1180px) {
+  .bingo-tv-dashboard {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "calls"
+      "patterns"
+      "report"
+      "side";
+    height: auto;
+    overflow-y: auto;
+  }
+
+  .bingo-tv-shell {
+    overflow-y: auto;
+  }
+
+  .bingo-tv-master-board {
+    height: auto;
+  }
+
+  .bingo-tv-column {
+    grid-template-rows: 42px repeat(15, 34px);
+  }
+}
+
+@media (max-width: 900px) {
+  .bingo-tv-button {
+    flex: 1 1 140px;
+  }
+}
+
+@media (max-width: 720px) {
+  .bingo-tv-shell {
+    padding: 12px;
+  }
+
+  .bingo-tv-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .bingo-tv-master-board {
+    gap: 5px;
+  }
+
+  .bingo-tv-column {
+    gap: 5px;
+    grid-template-rows: 34px repeat(15, 30px);
+  }
+
+  .bingo-tv-column span {
+    border-radius: 10px;
+    font-size: 0.82rem;
+  }
+
+  .bingo-tv-pattern-card {
+    grid-template-columns: 64px 1fr;
+  }
+
+  .pattern-mini-grid.tv {
+    width: 58px;
+    height: 58px;
+  }
+}

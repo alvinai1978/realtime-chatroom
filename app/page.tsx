@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { Bot, ChevronRight, Gamepad2, Loader2, MessageCircle, Play, Send, ShieldCheck, Sparkles, Trophy, UserRound, Users } from 'lucide-react';
+import { Bot, ChevronRight, Gamepad2, Loader2, MessageCircle, Monitor, Play, Send, ShieldCheck, Sparkles, Trophy, UserRound, Users, Volume2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 type Message = {
@@ -181,9 +181,14 @@ const jarvisTrivia = [
 ];
 
 const RESERVED_NAMES = new Set(['jarvis', 'system', 'guest', 'admin', 'administrator', 'moderator']);
+const ADMIN_NAMES = new Set(['ripple']);
 
 function cleanName(name: string) {
   return name.trim().replace(/\s+/g, ' ').slice(0, 40) || 'Guest';
+}
+
+function isAdminUserName(name: string) {
+  return ADMIN_NAMES.has(cleanName(name).toLowerCase());
 }
 
 function sanitizeParticipantName(name: string) {
@@ -453,6 +458,24 @@ function isBingoEligiblePlayer(round: ActiveBingoRound | null, userName: string)
   return round.eligiblePlayers.some((player) => normalizeBingoPlayerName(player) === normalizedUserName);
 }
 
+function getLatestBingoRound(currentMessages: Message[]): ActiveBingoRound | null {
+  const latestStart = [...currentMessages]
+    .reverse()
+    .find((message) => message.user_name === JARVIS_NAME && message.event_type === 'bingo_start' && message.event_key);
+
+  if (!latestStart?.event_key) return null;
+
+  const roundId = latestStart.event_key.replace('bingo-start-', '');
+  const parsedPatterns = parseBingoPatternList(latestStart.content);
+
+  return {
+    roundId,
+    patterns: parsedPatterns.length === 3 ? parsedPatterns : pickBingoPatterns(roundId),
+    startedAt: latestStart.created_at,
+    eligiblePlayers: parseBingoEligiblePlayers(latestStart.content)
+  };
+}
+
 function getActiveBingoRound(currentMessages: Message[]): ActiveBingoRound | null {
   const latestStart = [...currentMessages]
     .reverse()
@@ -625,6 +648,8 @@ export default function HomePage() {
   const [bingoMarkedNumbers, setBingoMarkedNumbers] = useState<number[]>([]);
   const [bingoNotice, setBingoNotice] = useState('');
   const [bingoMarkColor, setBingoMarkColor] = useState('blue');
+  const [isBingoTvMode, setIsBingoTvMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const currentPresenceKeyRef = useRef('');
@@ -633,9 +658,12 @@ export default function HomePage() {
   const celebrationTimerRef = useRef<number | null>(null);
   const activeBingoRoundRef = useRef<ActiveBingoRound | null>(null);
   const bingoCalledNumbersRef = useRef<number[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const lastBingoCallSoundRef = useRef('');
 
   const onlineCount = onlineUsers.length;
   const senderName = myName;
+  const isAdminUser = useMemo(() => isAdminUserName(myName), [myName]);
 
   const topScore = useMemo(() => sortScores(scores)[0] || null, [scores]);
 
@@ -646,9 +674,15 @@ export default function HomePage() {
   }, [scores]);
 
   const activeBingoRound = useMemo(() => getActiveBingoRound(messages), [messages]);
+  const latestBingoRound = useMemo(() => getLatestBingoRound(messages), [messages]);
+  const bingoTvRound = activeBingoRound || latestBingoRound;
   const bingoCalledNumbers = useMemo(
     () => getBingoCalledNumbers(messages, activeBingoRound?.roundId),
     [messages, activeBingoRound?.roundId]
+  );
+  const bingoTvCalledNumbers = useMemo(
+    () => getBingoCalledNumbers(messages, bingoTvRound?.roundId),
+    [messages, bingoTvRound?.roundId]
   );
   const bingoCalledSet = useMemo(() => new Set(bingoCalledNumbers), [bingoCalledNumbers]);
   const bingoMarkedSet = useMemo(() => new Set(bingoMarkedNumbers), [bingoMarkedNumbers]);
@@ -661,6 +695,19 @@ export default function HomePage() {
     if (!activeBingoRound) return null;
     return getBingoCallOrder(activeBingoRound.roundId)[bingoCalledNumbers.length] || null;
   }, [activeBingoRound?.roundId, bingoCalledNumbers.length]);
+
+  const bingoVerificationMessages = useMemo(() => {
+    if (!bingoTvRound) return [];
+    const startedAt = new Date(bingoTvRound.startedAt).getTime();
+
+    return messages.filter((message) => {
+      const messageTime = new Date(message.created_at).getTime();
+      const isVerificationEvent = message.event_type === 'bingo_winner' || message.event_type === 'bingo_invalid';
+      return isVerificationEvent && messageTime >= startedAt;
+    });
+  }, [messages, bingoTvRound?.roundId, bingoTvRound?.startedAt]);
+
+  const latestBingoVerification = bingoVerificationMessages[bingoVerificationMessages.length - 1] || null;
 
   const canJoinActiveBingo = useMemo(
     () => Boolean(activeBingoRound && myName && isBingoEligiblePlayer(activeBingoRound, myName)),
@@ -724,6 +771,90 @@ export default function HomePage() {
     }
 
     return uniqueName;
+  }
+
+
+  function getAudioContext() {
+    if (typeof window === 'undefined') return null;
+
+    const AudioContextConstructor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioContextConstructor) return null;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextConstructor();
+    }
+
+    return audioContextRef.current;
+  }
+
+  function playToneSequence(tones: Array<{ frequency: number; start: number; duration: number; volume: number }>) {
+    try {
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
+
+      if (audioContext.state === 'suspended') {
+        void audioContext.resume();
+      }
+
+      tones.forEach((tone) => {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(tone.frequency, audioContext.currentTime + tone.start);
+        gain.gain.setValueAtTime(0.0001, audioContext.currentTime + tone.start);
+        gain.gain.exponentialRampToValueAtTime(tone.volume, audioContext.currentTime + tone.start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + tone.start + tone.duration);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start(audioContext.currentTime + tone.start);
+        oscillator.stop(audioContext.currentTime + tone.start + tone.duration + 0.03);
+      });
+    } catch (error) {
+      console.warn('Bingo sound skipped:', getErrorText(error));
+    }
+  }
+
+  function enableBingoSounds() {
+    const audioContext = getAudioContext();
+    if (audioContext?.state === 'suspended') {
+      void audioContext.resume();
+    }
+    setSoundEnabled(true);
+    playToneSequence([{ frequency: 740, start: 0, duration: 0.08, volume: 0.05 }]);
+  }
+
+  function playBingoCallSound() {
+    if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
+    playToneSequence([
+      { frequency: 880, start: 0, duration: 0.09, volume: 0.08 },
+      { frequency: 1175, start: 0.11, duration: 0.14, volume: 0.075 }
+    ]);
+  }
+
+  function playConfettiSound() {
+    if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
+    playToneSequence([
+      { frequency: 784, start: 0, duration: 0.08, volume: 0.07 },
+      { frequency: 988, start: 0.09, duration: 0.08, volume: 0.07 },
+      { frequency: 1319, start: 0.18, duration: 0.12, volume: 0.075 },
+      { frequency: 1568, start: 0.31, duration: 0.15, volume: 0.06 }
+    ]);
+  }
+
+  function openBingoTvScreen() {
+    if (!isAdminUser) return;
+    enableBingoSounds();
+    const tvUrl = new URL(window.location.href);
+    tvUrl.searchParams.set('bingoTV', '1');
+    window.open(tvUrl.toString(), 'jarvis-bingo-tv', 'popup=yes,width=1366,height=768');
+  }
+
+  function enterBingoTvFullscreen() {
+    enableBingoSounds();
+    void document.documentElement.requestFullscreen?.();
   }
 
   function setTemporaryBingoNotice(message: string) {
@@ -790,6 +921,7 @@ export default function HomePage() {
       return;
     }
 
+    enableBingoSounds();
     localStorage.setItem(`bingo_joined_${activeBingoRound.roundId}_${myName}`, '1');
     setIsBingoParticipant(true);
     setIsBingoOpen(true);
@@ -813,6 +945,13 @@ export default function HomePage() {
   }
 
   async function startBingoRound() {
+    enableBingoSounds();
+
+    if (!isAdminUser) {
+      setTemporaryBingoNotice('Admin lang ang puwedeng mag-start ng Bingo. Admin name: Ripple.');
+      return;
+    }
+
     if (!myName) {
       setNameError('Maglagay muna ng participant name bago mag-start ng Bingo.');
       return;
@@ -936,6 +1075,7 @@ export default function HomePage() {
 
     setCelebrationText(`🏆 ${score.user_name} is the TOP SCORE! ${score.total_score} pts`);
     setConfettiPieces(pieces);
+    playConfettiSound();
 
     if (celebrationTimerRef.current) {
       window.clearTimeout(celebrationTimerRef.current);
@@ -1081,6 +1221,23 @@ export default function HomePage() {
       setBingoMarkColor(savedMarkColor);
     }
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tvMode = params.get('bingoTV') === '1' || params.get('view') === 'bingo-tv';
+    setIsBingoTvMode(tvMode);
+    if (tvMode) document.title = 'Jarvis BingoTV';
+  }, []);
+
+  useEffect(() => {
+    if (!activeBingoRound?.roundId || !latestBingoCall) return;
+
+    const callKey = `${activeBingoRound.roundId}:${bingoCalledNumbers.length}:${latestBingoCall}`;
+    if (lastBingoCallSoundRef.current === callKey) return;
+
+    lastBingoCallSoundRef.current = callKey;
+    playBingoCallSound();
+  }, [activeBingoRound?.roundId, latestBingoCall, bingoCalledNumbers.length, soundEnabled]);
 
   useEffect(() => {
     if (!myName || !channelRef.current) return;
@@ -1584,6 +1741,141 @@ export default function HomePage() {
     setSelectedSender(name);
   }
 
+  if (isBingoTvMode) {
+    const callOrder = bingoTvRound ? getBingoCallOrder(bingoTvRound.roundId) : [];
+    const nextTvCall = bingoTvRound ? callOrder[bingoTvCalledNumbers.length] || null : null;
+    const calledNumberSet = new Set(bingoTvCalledNumbers);
+    const latestTvBingoCall = bingoTvCalledNumbers.length ? bingoTvCalledNumbers[bingoTvCalledNumbers.length - 1] : null;
+
+    return (
+      <main className="bingo-tv-shell">
+        <section className="bingo-tv-hero">
+          <div>
+            <p>Jarvis hosted monitor</p>
+            <h1>BingoTV</h1>
+            <span>{bingoTvRound ? `Round ${bingoTvRound.roundId}` : 'Waiting for admin Ripple to start a round'}</span>
+          </div>
+          <div className="bingo-tv-live-card">
+            <span className={activeBingoRound ? 'live' : 'idle'}>{activeBingoRound ? 'LIVE ROUND' : bingoTvRound ? 'LAST ROUND' : 'STANDBY'}</span>
+            <strong>{latestTvBingoCall ? numberToBingoLabel(latestTvBingoCall) : '--'}</strong>
+            <small>Bingo Call #{bingoTvCalledNumbers.length || 0}</small>
+          </div>
+        </section>
+
+        <section className="bingo-tv-dashboard">
+          <div className="bingo-tv-panel bingo-tv-pattern-panel">
+            <div className="bingo-tv-panel-title">
+              <span>3 Patterns to Win</span>
+              <small>Official round patterns</small>
+            </div>
+            {bingoTvRound ? (
+              <div className="bingo-tv-pattern-list">
+                {bingoTvRound.patterns.map((pattern) => {
+                  const previewCells = getBingoPreviewCells(pattern.key);
+
+                  return (
+                    <article key={`tv-${pattern.key}`} className="bingo-tv-pattern-card">
+                      <div className="pattern-mini-grid tv" aria-hidden="true">
+                        {Array.from({ length: 25 }, (_, index) => {
+                          const row = Math.floor(index / 5);
+                          const column = index % 5;
+                          const isCenter = row === 2 && column === 2;
+                          return (
+                            <span
+                              key={`tv-${pattern.key}-${index}`}
+                              className={previewCells.has(`${row}-${column}`) || isCenter ? 'needed' : ''}
+                            >
+                              {isCenter ? 'F' : ''}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div>
+                        <strong>{pattern.label}</strong>
+                        <p>{pattern.description}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="bingo-tv-muted">No active Bingo round yet.</p>
+            )}
+          </div>
+
+          <div className="bingo-tv-panel bingo-tv-call-panel">
+            <div className="bingo-tv-panel-title">
+              <span>Master Called Numbers</span>
+              <small>{nextTvCall ? `Next hidden draw: ${numberToBingoLabel(nextTvCall)}` : 'Auto-hosted by Jarvis'}</small>
+            </div>
+            <div className="bingo-tv-master-board">
+              {BINGO_COLUMNS.map((column) => (
+                <div key={`tv-col-${column.letter}`} className="bingo-tv-column">
+                  <strong>{column.letter}</strong>
+                  {Array.from({ length: 15 }, (_, index) => column.min + index).map((number) => {
+                    const isCalled = calledNumberSet.has(number);
+                    const isLatest = latestTvBingoCall === number;
+                    return (
+                      <span key={`tv-number-${number}`} className={`${isCalled ? 'called' : ''} ${isLatest ? 'latest' : ''}`}>
+                        {number}
+                      </span>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bingo-tv-panel bingo-tv-report-panel">
+            <div className="bingo-tv-panel-title">
+              <span>Winner Verification Report</span>
+              <small>Jarvis checks claims vs. official called list</small>
+            </div>
+            {latestBingoVerification ? (
+              <div className={`bingo-tv-report ${latestBingoVerification.event_type === 'bingo_winner' ? 'valid' : 'invalid'}`}>
+                <strong>{latestBingoVerification.event_type === 'bingo_winner' ? 'VERIFIED WINNER' : 'INVALID CLAIM'}</strong>
+                <p>{latestBingoVerification.content}</p>
+                <small>{formatTime(latestBingoVerification.created_at)}</small>
+              </div>
+            ) : (
+              <div className="bingo-tv-report pending">
+                <strong>No winner yet</strong>
+                <p>Kapag may user na pumindot ng BINGO, lalabas dito ang verification result ni Jarvis.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bingo-tv-panel bingo-tv-side-panel">
+            <div className="bingo-tv-stat-grid">
+              <div>
+                <span>Players Online</span>
+                <strong>{onlineCount}</strong>
+              </div>
+              <div>
+                <span>Eligible Players</span>
+                <strong>{bingoTvRound?.eligiblePlayers.length || 0}</strong>
+              </div>
+              <div>
+                <span>Numbers Called</span>
+                <strong>{bingoTvCalledNumbers.length}/75</strong>
+              </div>
+              <div>
+                <span>Winner Score</span>
+                <strong>+{BINGO_WIN_SCORE}</strong>
+              </div>
+            </div>
+            <div className="bingo-tv-actions">
+              <button type="button" onClick={enableBingoSounds}>
+                <Volume2 size={18} /> {soundEnabled ? 'Sounds On' : 'Enable Sounds'}
+              </button>
+              <button type="button" onClick={enterBingoTvFullscreen}>Fullscreen</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="messenger-shell">
       {confettiPieces.length > 0 ? (
@@ -1762,9 +2054,15 @@ export default function HomePage() {
                 <Gamepad2 size={38} />
                 <h3>No active Bingo round</h3>
                 <p>Start Bingo para si Jarvis muna ang mag-host. Trivia at question games will pause while Bingo is active.</p>
-                <button type="button" onClick={startBingoRound}>
-                  <Play size={16} /> Start Bingo
-                </button>
+                {isAdminUser ? (
+                  <button type="button" onClick={startBingoRound}>
+                    <Play size={16} /> Start Bingo
+                  </button>
+                ) : (
+                  <button type="button" disabled>
+                    Hintayin si Ripple admin
+                  </button>
+                )}
               </div>
             )}
 
@@ -1868,6 +2166,11 @@ export default function HomePage() {
                 {topScore ? `${topScore.user_name} - ${topScore.total_score}` : 'No score yet'}
               </strong>
             </div>
+            {isAdminUser ? (
+              <button type="button" className="bingo-tv-button" onClick={openBingoTvScreen}>
+                <Monitor size={17} /> BingoTV
+              </button>
+            ) : null}
             <div className="sender-pill">Logged in as: <strong>{senderName || 'Name required'}</strong></div>
             {myName ? (
               <button type="button" className="logout-button" onClick={logoutChatroom}>
