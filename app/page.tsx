@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { Bot, ChevronRight, Gamepad2, KeyRound, Loader2, MessageCircle, Monitor, Play, Send, ShieldCheck, Sparkles, Trophy, UserRound, Users, Volume2 } from 'lucide-react';
+import { Bot, ChevronRight, Eye, Gamepad2, History, KeyRound, Loader2, MessageCircle, Monitor, Play, QrCode, RotateCcw, Send, Settings, ShieldCheck, Sparkles, StopCircle, Trash2, Trophy, UserCog, UserRound, UserX, Users, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 type Message = {
@@ -22,6 +22,8 @@ type OnlineUser = {
   key: string;
   name: string;
   onlineAt?: string;
+  avatar?: string;
+  profileColor?: string;
 };
 
 type UserScore = {
@@ -72,6 +74,11 @@ type ActiveBingoRound = {
   patterns: BingoPattern[];
   startedAt: string;
   eligiblePlayers: string[];
+  callIntervalMs: number;
+  winnerLimit: number;
+  prizeLabel: string;
+  patternCount: number;
+  allowLateJoiners: boolean;
 };
 
 type BingoCell = [number, number];
@@ -84,7 +91,13 @@ const GAME_ANSWER_DELAY_MS = 60000;
 const TRIVIA_INTERVAL_MS = 300000;
 const QUESTION_REPEAT_WINDOW = 20;
 const BINGO_CALL_INTERVAL_MS = 8000;
+const BINGO_HOST_TICK_MS = 1000;
 const BINGO_WIN_SCORE = 50;
+const BINGO_DEFAULT_PRIZE = 'Bingo Champion';
+const BINGO_SPEED_OPTIONS = [5000, 8000, 10000] as const;
+const BINGO_WINNER_LIMIT_OPTIONS = [1, 2, 3] as const;
+const BINGO_PATTERN_COUNT_OPTIONS = [1, 2, 3] as const;
+const BINGO_COUNTDOWN_SECONDS = 5;
 const BINGO_MARK_COLORS = [
   { key: 'blue', label: 'Blue', fill: 'rgba(10, 124, 255, 0.34)', border: 'rgba(10, 124, 255, 0.65)' },
   { key: 'purple', label: 'Purple', fill: 'rgba(124, 58, 237, 0.34)', border: 'rgba(124, 58, 237, 0.65)' },
@@ -92,6 +105,17 @@ const BINGO_MARK_COLORS = [
   { key: 'green', label: 'Green', fill: 'rgba(5, 150, 105, 0.30)', border: 'rgba(5, 150, 105, 0.60)' },
   { key: 'orange', label: 'Orange', fill: 'rgba(234, 88, 12, 0.32)', border: 'rgba(234, 88, 12, 0.62)' }
 ] as const;
+const USER_PROFILE_AVATARS = ['😀', '😎', '🤖', '🦊', '🐯', '🐼', '🐲', '🦅', '⭐', '🔥', '🎲', '🏆'] as const;
+const USER_PROFILE_COLORS = [
+  { key: 'sky', label: 'Sky', color: '#0a7cff', soft: '#e0f2fe' },
+  { key: 'violet', label: 'Violet', color: '#7c3aed', soft: '#ede9fe' },
+  { key: 'rose', label: 'Rose', color: '#e11d48', soft: '#ffe4e6' },
+  { key: 'emerald', label: 'Emerald', color: '#059669', soft: '#d1fae5' },
+  { key: 'amber', label: 'Amber', color: '#d97706', soft: '#fef3c7' },
+  { key: 'slate', label: 'Slate', color: '#334155', soft: '#e2e8f0' }
+] as const;
+const DEFAULT_SOUND_VOLUMES = { call: 0.8, winner: 0.85, invalid: 0.55, confetti: 0.8, countdown: 0.75 } as const;
+type SoundKey = keyof typeof DEFAULT_SOUND_VOLUMES;
 const BINGO_COLUMNS = [
   { letter: 'B', min: 1, max: 15 },
   { letter: 'I', min: 16, max: 30 },
@@ -432,8 +456,9 @@ function makeRoundId() {
   return Date.now().toString(36);
 }
 
-function pickBingoPatterns(roundId: string) {
-  return shuffleWithSeed(BINGO_PATTERN_POOL, `patterns-${roundId}`).slice(0, 3);
+function pickBingoPatterns(roundId: string, count = 3) {
+  const safeCount = Math.min(3, Math.max(1, count));
+  return shuffleWithSeed(BINGO_PATTERN_POOL, `patterns-${roundId}`).slice(0, safeCount);
 }
 
 function parseBingoPatternList(content: string) {
@@ -461,8 +486,176 @@ function parseBingoEligiblePlayers(content: string) {
     .filter((name) => name && name !== 'Guest');
 }
 
+function sanitizeBingoSettingValue(value: string) {
+  return value.replace(/[\]|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 48);
+}
+
+function parseBingoSettings(content: string) {
+  const defaults = {
+    callIntervalMs: BINGO_CALL_INTERVAL_MS,
+    winnerLimit: 1,
+    prizeLabel: BINGO_DEFAULT_PRIZE,
+    patternCount: 3,
+    allowLateJoiners: false
+  };
+  const match = content.match(/\[SETTINGS:\s*([^\]]*)\]/i);
+  if (!match) return defaults;
+
+  const settings = { ...defaults };
+  match[1].split('|').forEach((part) => {
+    const [rawKey, ...rawValueParts] = part.split('=');
+    const key = rawKey.trim().toLowerCase();
+    const value = rawValueParts.join('=').trim();
+
+    if (key === 'callms') {
+      const parsed = Number(value);
+      if (BINGO_SPEED_OPTIONS.includes(parsed as (typeof BINGO_SPEED_OPTIONS)[number])) {
+        settings.callIntervalMs = parsed;
+      }
+    }
+
+    if (key === 'winnerlimit') {
+      const parsed = Number(value);
+      if (BINGO_WINNER_LIMIT_OPTIONS.includes(parsed as (typeof BINGO_WINNER_LIMIT_OPTIONS)[number])) {
+        settings.winnerLimit = parsed;
+      }
+    }
+
+    if (key === 'patterncount') {
+      const parsed = Number(value);
+      if (BINGO_PATTERN_COUNT_OPTIONS.includes(parsed as (typeof BINGO_PATTERN_COUNT_OPTIONS)[number])) {
+        settings.patternCount = parsed;
+      }
+    }
+
+    if (key === 'allowlatejoiners') {
+      settings.allowLateJoiners = value === '1' || value.toLowerCase() === 'true' || value.toLowerCase() === 'yes';
+    }
+
+    if (key === 'prize') {
+      settings.prizeLabel = sanitizeBingoSettingValue(value) || BINGO_DEFAULT_PRIZE;
+    }
+  });
+
+  return settings;
+}
+
+
+function getLatestScoreResetBaseline(currentMessages: Message[]) {
+  const latestReset = [...currentMessages].reverse().find((message) => message.event_type === 'score_reset');
+  if (!latestReset) return new Map<string, number>();
+
+  const baseline = new Map<string, number>();
+  const match = latestReset.content.match(/\[SCORE_BASELINE:\s*([^\]]*)\]/i);
+  if (!match) return baseline;
+
+  match[1].split('|').forEach((entry) => {
+    const [rawName, rawScore] = entry.split('=');
+    const name = cleanName(rawName || '');
+    const score = Number(rawScore || 0);
+    if (name && Number.isFinite(score)) baseline.set(name, score);
+  });
+
+  return baseline;
+}
+
+function applyScoreBaseline(scores: UserScore[], baseline: Map<string, number>) {
+  return sortScores(
+    scores.map((score) => ({
+      ...score,
+      total_score: Math.max(0, Number(score.total_score || 0) - Number(baseline.get(score.user_name) || 0))
+    }))
+  ).filter((score) => score.total_score > 0);
+}
+
+function getLastChatClearTime(currentMessages: Message[]) {
+  const latestClear = [...currentMessages].reverse().find((message) => message.event_type === 'chat_clear');
+  return latestClear ? new Date(latestClear.created_at).getTime() : 0;
+}
+
+function parseAdminTarget(content: string) {
+  const match = content.match(/\[TARGET:\s*([^\]]+)\]/i);
+  return match ? cleanName(match[1]) : '';
+}
+
+function getActiveAdminTargets(currentMessages: Message[], activeEvent: string, clearEvent: string) {
+  const targets = new Set<string>();
+
+  currentMessages.forEach((message) => {
+    const target = parseAdminTarget(message.content);
+    if (!target) return;
+
+    const normalized = normalizeBingoPlayerName(target);
+    if (message.event_type === activeEvent) targets.add(normalized);
+    if (message.event_type === clearEvent) targets.delete(normalized);
+  });
+
+  return targets;
+}
+
+function getBingoJoinedPlayers(currentMessages: Message[], roundId?: string, eligiblePlayers: string[] = []) {
+  const players = new Set(eligiblePlayers.map((player) => cleanName(player)).filter(Boolean));
+  if (!roundId) return Array.from(players).sort((a, b) => a.localeCompare(b));
+
+  currentMessages.forEach((message) => {
+    if (message.event_type !== 'bingo_join') return;
+    if (!message.event_key?.startsWith(`bingo-join-${roundId}-`)) return;
+    const target = parseAdminTarget(message.content) || message.user_name;
+    if (target) players.add(cleanName(target));
+  });
+
+  return Array.from(players).sort((a, b) => a.localeCompare(b));
+}
+
+function parseBingoWinnerRecord(message: Message) {
+  const content = message.content;
+  const name = content.match(/Winner #\d+:\s*([^\s].*?)\s+wins Round/i)?.[1]?.trim() || '';
+  const roundId = content.match(/Round\s+([a-z0-9]+)/i)?.[1] || '';
+  const pattern = content.match(/with\s+([^.]*)\./i)?.[1]?.trim() || 'Verified pattern';
+  const score = content.match(/\+(\d+)\s+score/i)?.[1] || String(BINGO_WIN_SCORE);
+  return { name, roundId, pattern, score, time: message.created_at, verification: 'Verified by Jarvis' };
+}
+
+function getDefaultAvatar(name: string) {
+  return USER_PROFILE_AVATARS[getUserHue(name) % USER_PROFILE_AVATARS.length];
+}
+
+function getProfileColorStyle(colorKey: string, name: string): CSSProperties {
+  const profileColor = USER_PROFILE_COLORS.find((item) => item.key === colorKey);
+  if (!profileColor) return getUserAccentStyle(name);
+  return { '--user-color': profileColor.color, '--user-soft': profileColor.soft } as CSSProperties;
+}
+
+function encodeQrData(value: string) {
+  return encodeURIComponent(value);
+}
+
+function formatBingoSeconds(ms: number) {
+  return `${Math.round(ms / 1000)} sec`;
+}
+
+function eventSafeSlug(value: string) {
+  return normalizeText(value).replace(/\s+/g, '-').slice(0, 40) || 'player';
+}
+
+function getBingoWinnerMessages(currentMessages: Message[], roundId?: string, startedAt?: string) {
+  if (!roundId) return [];
+  const startTime = startedAt ? new Date(startedAt).getTime() : 0;
+
+  return currentMessages.filter((message) => {
+    const messageTime = new Date(message.created_at).getTime();
+    return (
+      message.event_type === 'bingo_winner' &&
+      messageTime >= startTime &&
+      Boolean(message.event_key?.includes(roundId))
+    );
+  });
+}
+
 function isBingoEligiblePlayer(round: ActiveBingoRound | null, userName: string) {
   if (!round || !userName) return false;
+
+  if (round.allowLateJoiners) return true;
 
   // Backward-compatible: older Bingo start messages had no eligible-player lock.
   if (!round.eligiblePlayers.length) return true;
@@ -481,11 +674,14 @@ function getLatestBingoRound(currentMessages: Message[]): ActiveBingoRound | nul
   const roundId = latestStart.event_key.replace('bingo-start-', '');
   const parsedPatterns = parseBingoPatternList(latestStart.content);
 
+  const settings = parseBingoSettings(latestStart.content);
+
   return {
     roundId,
-    patterns: parsedPatterns.length === 3 ? parsedPatterns : pickBingoPatterns(roundId),
+    patterns: parsedPatterns.length ? parsedPatterns : pickBingoPatterns(roundId, settings.patternCount),
     startedAt: latestStart.created_at,
-    eligiblePlayers: parseBingoEligiblePlayers(latestStart.content)
+    eligiblePlayers: parseBingoEligiblePlayers(latestStart.content),
+    ...settings
   };
 }
 
@@ -498,14 +694,17 @@ function getActiveBingoRound(currentMessages: Message[]): ActiveBingoRound | nul
 
   const roundId = latestStart.event_key.replace('bingo-start-', '');
   const startTime = new Date(latestStart.created_at).getTime();
-  const hasEnded = currentMessages.some((message) => {
+  const settings = parseBingoSettings(latestStart.content);
+  const winnerMessages = getBingoWinnerMessages(currentMessages, roundId, latestStart.created_at);
+  const hasManualEnd = currentMessages.some((message) => {
     const messageTime = new Date(message.created_at).getTime();
     return (
       messageTime > startTime &&
-      (message.event_type === 'bingo_winner' || message.event_type === 'bingo_end') &&
+      message.event_type === 'bingo_end' &&
       Boolean(message.event_key?.includes(roundId))
     );
   });
+  const hasEnded = hasManualEnd || winnerMessages.length >= settings.winnerLimit;
 
   if (hasEnded) return null;
 
@@ -513,9 +712,10 @@ function getActiveBingoRound(currentMessages: Message[]): ActiveBingoRound | nul
 
   return {
     roundId,
-    patterns: parsedPatterns.length === 3 ? parsedPatterns : pickBingoPatterns(roundId),
+    patterns: parsedPatterns.length ? parsedPatterns : pickBingoPatterns(roundId, settings.patternCount),
     startedAt: latestStart.created_at,
-    eligiblePlayers: parseBingoEligiblePlayers(latestStart.content)
+    eligiblePlayers: parseBingoEligiblePlayers(latestStart.content),
+    ...settings
   };
 }
 
@@ -535,8 +735,21 @@ function parseBingoCallNumber(content: string) {
 function getBingoCalledNumbers(currentMessages: Message[], roundId?: string) {
   if (!roundId) return [];
 
+  const roundEvents = currentMessages.filter((message) => message.event_key?.includes(roundId));
+  const latestResetTime = [...roundEvents]
+    .reverse()
+    .find((message) => message.event_type === 'bingo_reset_calls');
+  const resetTime = latestResetTime ? new Date(latestResetTime.created_at).getTime() : 0;
+
   return currentMessages
-    .filter((message) => message.event_type === 'bingo_call' && message.event_key?.startsWith(`bingo-call-${roundId}-`))
+    .filter((message) => {
+      const messageTime = new Date(message.created_at).getTime();
+      return (
+        message.event_type === 'bingo_call' &&
+        message.event_key?.startsWith(`bingo-call-${roundId}-`) &&
+        messageTime > resetTime
+      );
+    })
     .map((message) => parseBingoCallNumber(message.content))
     .filter((number): number is number => typeof number === 'number');
 }
@@ -663,6 +876,16 @@ export default function HomePage() {
   const [bingoMarkedNumbers, setBingoMarkedNumbers] = useState<number[]>([]);
   const [bingoNotice, setBingoNotice] = useState('');
   const [bingoMarkColor, setBingoMarkColor] = useState('blue');
+  const [bingoCallSpeedMs, setBingoCallSpeedMs] = useState<number>(BINGO_CALL_INTERVAL_MS);
+  const [bingoWinnerLimit, setBingoWinnerLimit] = useState<number>(1);
+  const [bingoPatternCount, setBingoPatternCount] = useState<number>(3);
+  const [allowLateBingoJoiners, setAllowLateBingoJoiners] = useState(false);
+  const [bingoPrizeLabel, setBingoPrizeLabel] = useState(BINGO_DEFAULT_PRIZE);
+  const [adminSelectedPlayer, setAdminSelectedPlayer] = useState('');
+  const [bingoCountdown, setBingoCountdown] = useState(0);
+  const [userAvatar, setUserAvatar] = useState('😀');
+  const [userProfileColor, setUserProfileColor] = useState('sky');
+  const [soundVolumes, setSoundVolumes] = useState<Record<SoundKey, number>>({ ...DEFAULT_SOUND_VOLUMES });
   const [isBingoTvMode, setIsBingoTvMode] = useState(() => isBingoTvUrl());
   const [bingoTvSyncAt, setBingoTvSyncAt] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -686,13 +909,24 @@ export default function HomePage() {
     [myName, isAdminAuthenticated]
   );
 
-  const topScore = useMemo(() => sortScores(scores)[0] || null, [scores]);
+  const scoreResetBaseline = useMemo(() => getLatestScoreResetBaseline(messages), [messages]);
+  const displayScores = useMemo(() => applyScoreBaseline(scores, scoreResetBaseline), [scores, scoreResetBaseline]);
+  const topScore = useMemo(() => sortScores(displayScores)[0] || null, [displayScores]);
 
   const scoreMap = useMemo(() => {
     const map = new Map<string, number>();
-    scores.forEach((score) => map.set(score.user_name, Number(score.total_score || 0)));
+    displayScores.forEach((score) => map.set(score.user_name, Number(score.total_score || 0)));
     return map;
-  }, [scores]);
+  }, [displayScores]);
+
+  const mutedUsers = useMemo(() => getActiveAdminTargets(messages, 'admin_mute', 'admin_unmute'), [messages]);
+  const kickedUsers = useMemo(() => getActiveAdminTargets(messages, 'admin_kick', 'admin_restore'), [messages]);
+  const isMuted = myName ? mutedUsers.has(normalizeBingoPlayerName(myName)) : false;
+  const chatClearTime = useMemo(() => getLastChatClearTime(messages), [messages]);
+  const displayedMessages = useMemo(
+    () => messages.filter((message) => new Date(message.created_at).getTime() > chatClearTime || message.event_type === 'chat_clear'),
+    [messages, chatClearTime]
+  );
 
   const activeBingoRound = useMemo(() => getActiveBingoRound(messages), [messages]);
   const latestBingoRound = useMemo(() => getLatestBingoRound(messages), [messages]);
@@ -729,6 +963,24 @@ export default function HomePage() {
   }, [messages, bingoTvRound?.roundId, bingoTvRound?.startedAt]);
 
   const latestBingoVerification = bingoVerificationMessages[bingoVerificationMessages.length - 1] || null;
+  const activeBingoWinners = useMemo(
+    () => (activeBingoRound ? getBingoWinnerMessages(messages, activeBingoRound.roundId, activeBingoRound.startedAt) : []),
+    [messages, activeBingoRound?.roundId, activeBingoRound?.startedAt]
+  );
+  const bingoWinnerHistory = useMemo(
+    () => messages.filter((message) => message.event_type === 'bingo_winner').slice(-20).reverse(),
+    [messages]
+  );
+  const bingoWinnerRecords = useMemo(() => bingoWinnerHistory.map(parseBingoWinnerRecord), [bingoWinnerHistory]);
+  const bingoJoinedPlayers = useMemo(
+    () => getBingoJoinedPlayers(messages, bingoTvRound?.roundId, bingoTvRound?.eligiblePlayers || []),
+    [messages, bingoTvRound?.roundId, bingoTvRound?.eligiblePlayers.join('|')]
+  );
+  const adminCardPlayer = adminSelectedPlayer || bingoJoinedPlayers[0] || myName;
+  const adminPreviewCard = useMemo(
+    () => (bingoTvRound && adminCardPlayer ? generateBingoCard(`${bingoTvRound.roundId}:${adminCardPlayer}`) : null),
+    [bingoTvRound?.roundId, adminCardPlayer]
+  );
   const latestBingoTvMessage = useMemo(() => {
     if (!bingoTvRound) return null;
     const startedAt = new Date(bingoTvRound.startedAt).getTime();
@@ -877,22 +1129,58 @@ export default function HomePage() {
     playToneSequence([{ frequency: 740, start: 0, duration: 0.08, volume: 0.05 }]);
   }
 
+  function getSoundVolume(key: SoundKey, base: number) {
+    return Math.max(0, Math.min(1, soundVolumes[key] ?? DEFAULT_SOUND_VOLUMES[key])) * base;
+  }
+
   function playBingoCallSound() {
     if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
     playToneSequence([
-      { frequency: 880, start: 0, duration: 0.09, volume: 0.08 },
-      { frequency: 1175, start: 0.11, duration: 0.14, volume: 0.075 }
+      { frequency: 880, start: 0, duration: 0.09, volume: getSoundVolume('call', 0.10) },
+      { frequency: 1175, start: 0.11, duration: 0.14, volume: getSoundVolume('call', 0.09) }
     ]);
+  }
+
+  function playWinnerSound() {
+    if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
+    playToneSequence([
+      { frequency: 659, start: 0, duration: 0.12, volume: getSoundVolume('winner', 0.08) },
+      { frequency: 880, start: 0.13, duration: 0.12, volume: getSoundVolume('winner', 0.08) },
+      { frequency: 1319, start: 0.28, duration: 0.2, volume: getSoundVolume('winner', 0.075) }
+    ]);
+  }
+
+  function playInvalidClaimSound() {
+    if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
+    playToneSequence([
+      { frequency: 220, start: 0, duration: 0.13, volume: getSoundVolume('invalid', 0.08) },
+      { frequency: 180, start: 0.15, duration: 0.18, volume: getSoundVolume('invalid', 0.07) }
+    ]);
+  }
+
+  function playCountdownSound() {
+    if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
+    playToneSequence([{ frequency: 740, start: 0, duration: 0.1, volume: getSoundVolume('countdown', 0.065) }]);
   }
 
   function playConfettiSound() {
     if (!soundEnabled && audioContextRef.current?.state !== 'running') return;
     playToneSequence([
-      { frequency: 784, start: 0, duration: 0.08, volume: 0.07 },
-      { frequency: 988, start: 0.09, duration: 0.08, volume: 0.07 },
-      { frequency: 1319, start: 0.18, duration: 0.12, volume: 0.075 },
-      { frequency: 1568, start: 0.31, duration: 0.15, volume: 0.06 }
+      { frequency: 784, start: 0, duration: 0.08, volume: getSoundVolume('confetti', 0.08) },
+      { frequency: 988, start: 0.09, duration: 0.08, volume: getSoundVolume('confetti', 0.08) },
+      { frequency: 1319, start: 0.18, duration: 0.12, volume: getSoundVolume('confetti', 0.085) },
+      { frequency: 1568, start: 0.31, duration: 0.15, volume: getSoundVolume('confetti', 0.07) }
     ]);
+  }
+
+  function changeSoundVolume(key: SoundKey, value: string) {
+    const next = Math.max(0, Math.min(1, Number(value)));
+    if (!Number.isFinite(next)) return;
+    setSoundVolumes((current) => {
+      const updated = { ...current, [key]: next };
+      localStorage.setItem('bingo_sound_volumes', JSON.stringify(updated));
+      return updated;
+    });
   }
 
   function getBingoTvUrl() {
@@ -936,6 +1224,138 @@ export default function HomePage() {
     if (!BINGO_MARK_COLORS.some((color) => color.key === colorKey)) return;
     setBingoMarkColor(colorKey);
     localStorage.setItem('bingo_mark_color', colorKey);
+  }
+
+  function changeBingoCallSpeed(value: string) {
+    const nextSpeed = Number(value);
+    if (!BINGO_SPEED_OPTIONS.includes(nextSpeed as (typeof BINGO_SPEED_OPTIONS)[number])) return;
+    setBingoCallSpeedMs(nextSpeed);
+    localStorage.setItem('bingo_call_speed_ms', String(nextSpeed));
+  }
+
+  function changeBingoWinnerLimit(value: string) {
+    const nextLimit = Number(value);
+    if (!BINGO_WINNER_LIMIT_OPTIONS.includes(nextLimit as (typeof BINGO_WINNER_LIMIT_OPTIONS)[number])) return;
+    setBingoWinnerLimit(nextLimit);
+    localStorage.setItem('bingo_winner_limit', String(nextLimit));
+  }
+
+  function changeBingoPatternCount(value: string) {
+    const nextCount = Number(value);
+    if (!BINGO_PATTERN_COUNT_OPTIONS.includes(nextCount as (typeof BINGO_PATTERN_COUNT_OPTIONS)[number])) return;
+    setBingoPatternCount(nextCount);
+    localStorage.setItem('bingo_pattern_count', String(nextCount));
+  }
+
+  function changeAllowLateBingoJoiners(value: boolean) {
+    setAllowLateBingoJoiners(value);
+    localStorage.setItem('bingo_allow_late_joiners', value ? '1' : '0');
+  }
+
+  function changeUserAvatar(value: string) {
+    if (!USER_PROFILE_AVATARS.includes(value as (typeof USER_PROFILE_AVATARS)[number])) return;
+    setUserAvatar(value);
+    localStorage.setItem('chat_user_avatar', value);
+  }
+
+  function changeUserProfileColor(value: string) {
+    if (!USER_PROFILE_COLORS.some((color) => color.key === value)) return;
+    setUserProfileColor(value);
+    localStorage.setItem('chat_profile_color', value);
+  }
+
+  function changeBingoPrizeLabel(value: string) {
+    const nextPrize = sanitizeBingoSettingValue(value);
+    setBingoPrizeLabel(nextPrize);
+    localStorage.setItem('bingo_prize_label', nextPrize);
+  }
+
+  async function endBingoRound() {
+    const round = activeBingoRoundRef.current;
+    if (!isAdminUser || !round) return;
+
+    await insertUniqueEvent(
+      `🛑 Ripple ended Bingo Round ${round.roundId}. Winner report is now closed.`,
+      JARVIS_NAME,
+      `bingo-end-${round.roundId}-manual`,
+      'bingo_end',
+      { isAi: true }
+    );
+    setTemporaryBingoNotice('Bingo round ended by Ripple admin.');
+  }
+
+
+
+  async function resetBingoCalls() {
+    const round = activeBingoRoundRef.current;
+    if (!isAdminUser || !round) return;
+
+    await insertUniqueEvent(
+      `🔄 Ripple reset the called numbers for Bingo Round ${round.roundId}. Jarvis will start calling again from Call #1.`,
+      JARVIS_NAME,
+      `bingo-reset-calls-${round.roundId}-${Date.now()}`,
+      'bingo_reset_calls',
+      { isAi: true }
+    );
+    setTemporaryBingoNotice('Bingo calls reset for this round.');
+  }
+
+  async function resetScoreDisplay() {
+    if (!isAdminUser) return;
+    const baseline = scores.map((score) => `${cleanName(score.user_name)}=${Number(score.total_score || 0)}`).join('|');
+    await insertUniqueEvent(
+      `🔄 Ripple reset the visible scoreboard from this point. [SCORE_BASELINE: ${baseline}]`,
+      'System',
+      `score-reset-${Date.now()}`,
+      'score_reset',
+      { isAi: true }
+    );
+    setTemporaryBingoNotice('Scoreboard display reset. Future scores count from zero.');
+  }
+
+  async function clearChatDisplay() {
+    if (!isAdminUser) return;
+    await insertUniqueEvent(
+      '🧹 Ripple cleared the chat display. New messages will show from here.',
+      'System',
+      `chat-clear-${Date.now()}`,
+      'chat_clear',
+      { isAi: true }
+    );
+    setTemporaryBingoNotice('Chat display cleared.');
+  }
+
+  async function muteUser(targetName: string) {
+    if (!isAdminUser || !targetName || isAdminUserName(targetName)) return;
+    await insertUniqueEvent(
+      `🔇 Ripple muted ${targetName}. [TARGET: ${targetName}]`,
+      'System',
+      `admin-mute-${eventSafeSlug(targetName)}-${Date.now()}`,
+      'admin_mute',
+      { isAi: true }
+    );
+  }
+
+  async function unmuteUser(targetName: string) {
+    if (!isAdminUser || !targetName) return;
+    await insertUniqueEvent(
+      `🔊 Ripple unmuted ${targetName}. [TARGET: ${targetName}]`,
+      'System',
+      `admin-unmute-${eventSafeSlug(targetName)}-${Date.now()}`,
+      'admin_unmute',
+      { isAi: true }
+    );
+  }
+
+  async function kickUser(targetName: string) {
+    if (!isAdminUser || !targetName || isAdminUserName(targetName)) return;
+    await insertUniqueEvent(
+      `🚪 Ripple kicked ${targetName} from the chatroom. [TARGET: ${targetName}]`,
+      'System',
+      `admin-kick-${eventSafeSlug(targetName)}-${Date.now()}`,
+      'admin_kick',
+      { isAi: true }
+    );
   }
 
   function leaveBingoRound() {
@@ -992,6 +1412,13 @@ export default function HomePage() {
 
     enableBingoSounds();
     localStorage.setItem(`bingo_joined_${activeBingoRound.roundId}_${myName}`, '1');
+    void insertUniqueEvent(
+      `🎟️ ${myName} joined Bingo Round ${activeBingoRound.roundId}. [TARGET: ${myName}]`,
+      'System',
+      `bingo-join-${activeBingoRound.roundId}-${eventSafeSlug(myName)}`,
+      'bingo_join',
+      { isAi: true }
+    );
     setIsBingoParticipant(true);
     setIsBingoOpen(true);
     setTemporaryBingoNotice('Bingo card ready. Markahan lang ang mga number na tinawag ni Jarvis.');
@@ -1035,10 +1462,11 @@ export default function HomePage() {
     }
 
     const roundId = makeRoundId();
-    const patterns = pickBingoPatterns(roundId);
+    const patterns = pickBingoPatterns(roundId, bingoPatternCount);
     const patternText = patterns.map((pattern) => pattern.label).join(', ');
+    const safePrizeLabel = sanitizeBingoSettingValue(bingoPrizeLabel) || BINGO_DEFAULT_PRIZE;
     const eligiblePlayers = Array.from(
-      new Set(
+      new Set<string>(
         userList
           .map((user) => cleanName(user.name))
           .filter((name) => name && name !== JARVIS_NAME && name !== 'System')
@@ -1046,16 +1474,27 @@ export default function HomePage() {
     ).sort((a, b) => a.localeCompare(b));
     const eligibleText = eligiblePlayers.length ? eligiblePlayers.join(' | ') : cleanName(myName);
 
+    setIsBingoOpen(true);
+    setBingoCountdown(BINGO_COUNTDOWN_SECONDS);
     await insertUniqueEvent(
-      `🎱 Jarvis Bingo started! Round ${roundId}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. Late joiners must wait for the next round. Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}]`,
+      `⏳ Bingo starts in ${BINGO_COUNTDOWN_SECONDS} seconds! Prize: ${safePrizeLabel}. Get ready on your cards. [COUNTDOWN: roundId=${roundId}|seconds=${BINGO_COUNTDOWN_SECONDS}]`,
       JARVIS_NAME,
-      `bingo-start-${roundId}`,
-      'bingo_start',
+      `bingo-countdown-${roundId}`,
+      'bingo_countdown',
       { isAi: true }
     );
 
-    setIsBingoOpen(true);
-    setTemporaryBingoNotice(autoBingoTvWindow ? 'Bingo round started. BingoTV monitor opened automatically.' : 'Bingo round started. Popup blocked ang BingoTV; click BingoTV button.');
+    window.setTimeout(async () => {
+      await insertUniqueEvent(
+        `🎱 Jarvis Bingo started! Round ${roundId}. Prize: ${safePrizeLabel}. Winner limit: ${bingoWinnerLimit}. Calls every ${formatBingoSeconds(bingoCallSpeedMs)}. Patterns to win: ${patternText}. Eligible players: ${eligibleText.replace(/ \| /g, ', ')}. ${allowLateBingoJoiners ? 'Late joiners are allowed for this round.' : 'Late joiners must wait for the next round.'} Join using the Bingo tab. Trivia and Jarvis question games are paused while Bingo is active. [ELIGIBLE: ${eligibleText}] [SETTINGS: callMs=${bingoCallSpeedMs}|winnerLimit=${bingoWinnerLimit}|patternCount=${bingoPatternCount}|allowLateJoiners=${allowLateBingoJoiners ? '1' : '0'}|prize=${safePrizeLabel}]`,
+        JARVIS_NAME,
+        `bingo-start-${roundId}`,
+        'bingo_start',
+        { isAi: true }
+      );
+      setBingoCountdown(0);
+      setTemporaryBingoNotice(autoBingoTvWindow ? 'Bingo round started. BingoTV monitor opened automatically.' : 'Bingo round started. Popup blocked ang BingoTV; click BingoTV button.');
+    }, BINGO_COUNTDOWN_SECONDS * 1000);
   }
 
   async function postNextBingoCall() {
@@ -1063,6 +1502,16 @@ export default function HomePage() {
     if (!round) return;
 
     const calledNumbers = bingoCalledNumbersRef.current;
+    const latestCallMessage = [...messagesRef.current]
+      .reverse()
+      .find((message) => message.event_type === 'bingo_call' && message.event_key?.startsWith(`bingo-call-${round.roundId}-`));
+
+    if (latestCallMessage) {
+      const elapsedMs = Date.now() - new Date(latestCallMessage.created_at).getTime();
+      const requiredDelayMs = Math.max(1000, (round.callIntervalMs || BINGO_CALL_INTERVAL_MS) - 250);
+      if (elapsedMs < requiredDelayMs) return;
+    }
+
     if (calledNumbers.length >= 75) {
       await insertUniqueEvent(
         '🎱 Bingo round ended. All 75 numbers were called and no verified winner was recorded.',
@@ -1081,7 +1530,7 @@ export default function HomePage() {
     await insertUniqueEvent(
       `🎱 Bingo Call #${nextIndex + 1}: ${numberToBingoLabel(nextNumber)}`,
       JARVIS_NAME,
-      `bingo-call-${round.roundId}-${nextIndex}`,
+      `bingo-call-${round.roundId}-${Date.now()}-${nextIndex}`,
       'bingo_call',
       { isAi: true }
     );
@@ -1100,35 +1549,62 @@ export default function HomePage() {
       return;
     }
 
+    const currentWinnerMessages = getBingoWinnerMessages(messagesRef.current, activeBingoRound.roundId, activeBingoRound.startedAt);
+    const alreadyWonThisRound = currentWinnerMessages.some((message) => message.event_key?.endsWith(`-${eventSafeSlug(myName)}`));
+
+    if (currentWinnerMessages.length >= activeBingoRound.winnerLimit) {
+      setTemporaryBingoNotice('Tapos na ang winner limit ng round na ito. Wait for next Bingo session.');
+      return;
+    }
+
+    if (alreadyWonThisRound) {
+      setTemporaryBingoNotice('Verified winner ka na sa round na ito. Wait for next Bingo session.');
+      return;
+    }
+
     const winningPattern = verifyBingoCard(bingoCard, bingoCalledSet, activeBingoRound.patterns);
 
     if (winningPattern) {
+      const winnerNumber = currentWinnerMessages.length + 1;
       const winnerMessage = await insertUniqueEvent(
-        `🏆 BINGO verified! ${myName} wins Round ${activeBingoRound.roundId} with ${winningPattern.label}. +${BINGO_WIN_SCORE} score! Jarvis checked the card against the official called numbers.`,
+        `🏆 BINGO verified! Winner #${winnerNumber}: ${myName} wins Round ${activeBingoRound.roundId} with ${winningPattern.label}. Prize: ${activeBingoRound.prizeLabel}. +${BINGO_WIN_SCORE} score! Jarvis checked the card against the official called numbers.`,
         JARVIS_NAME,
-        `bingo-winner-${activeBingoRound.roundId}`,
+        `bingo-winner-${activeBingoRound.roundId}-${eventSafeSlug(myName)}`,
         'bingo_winner',
         { isAi: true }
       );
 
       if (winnerMessage) {
-        const awarded = await awardScoreOnce(myName, `bingo-${activeBingoRound.roundId}`, BINGO_WIN_SCORE);
+        playWinnerSound();
+        const awarded = await awardScoreOnce(myName, `bingo-${activeBingoRound.roundId}-${eventSafeSlug(myName)}`, BINGO_WIN_SCORE);
         triggerTopScoreCelebration({
           user_name: myName,
           total_score: Number(scoreMap.get(myName) || 0) + (awarded ? BINGO_WIN_SCORE : 0)
         });
+
+        if (winnerNumber >= activeBingoRound.winnerLimit) {
+          await insertUniqueEvent(
+            `✅ Bingo Round ${activeBingoRound.roundId} closed. Winner limit reached (${activeBingoRound.winnerLimit}/${activeBingoRound.winnerLimit}).`,
+            JARVIS_NAME,
+            `bingo-end-${activeBingoRound.roundId}-winner-limit`,
+            'bingo_end',
+            { isAi: true }
+          );
+        }
       }
 
       setTemporaryBingoNotice(`Verified BINGO: ${winningPattern.label}! +${BINGO_WIN_SCORE} score.`);
       return;
     }
 
-    await insertMessage(
-      `🎱 Jarvis checked ${myName}'s BINGO claim: not valid yet. Continue playing.`,
-      true,
+    await insertUniqueEvent(
+      `🚨 Suspicious/invalid Bingo claim by ${myName}. Jarvis verified: not valid yet. [TARGET: ${myName}]`,
       JARVIS_NAME,
-      { eventType: 'bingo_invalid' }
+      `bingo-invalid-${activeBingoRound.roundId}-${eventSafeSlug(myName)}-${Date.now()}`,
+      'bingo_invalid',
+      { isAi: true }
     );
+    playInvalidClaimSound();
     setTemporaryBingoNotice('Hindi pa valid ang BINGO. Kulang pa sa called numbers.');
   }
 
@@ -1189,20 +1665,20 @@ export default function HomePage() {
     });
 
     if (myName) {
-      map.set(myName, { key: 'me', name: myName, onlineAt: new Date().toISOString() });
+      map.set(myName, { key: 'me', name: myName, onlineAt: new Date().toISOString(), avatar: userAvatar, profileColor: userProfileColor });
     }
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [onlineUsers, myName, isAdminUser]);
+  }, [onlineUsers, myName, isAdminUser, userAvatar, userProfileColor]);
 
   const recentMessagesForJarvis = useMemo(
     () =>
-      messages.slice(-8).map((message) => ({
+      displayedMessages.slice(-8).map((message) => ({
         user_name: message.user_name,
         content: message.content,
         is_ai: message.is_ai
       })),
-    [messages]
+    [displayedMessages]
   );
 
   useEffect(() => {
@@ -1305,6 +1781,39 @@ export default function HomePage() {
     if (BINGO_MARK_COLORS.some((color) => color.key === savedMarkColor)) {
       setBingoMarkColor(savedMarkColor);
     }
+
+    const savedCallSpeed = Number(localStorage.getItem('bingo_call_speed_ms') || BINGO_CALL_INTERVAL_MS);
+    if (BINGO_SPEED_OPTIONS.includes(savedCallSpeed as (typeof BINGO_SPEED_OPTIONS)[number])) {
+      setBingoCallSpeedMs(savedCallSpeed);
+    }
+
+    const savedWinnerLimit = Number(localStorage.getItem('bingo_winner_limit') || 1);
+    if (BINGO_WINNER_LIMIT_OPTIONS.includes(savedWinnerLimit as (typeof BINGO_WINNER_LIMIT_OPTIONS)[number])) {
+      setBingoWinnerLimit(savedWinnerLimit);
+    }
+
+    const savedPatternCount = Number(localStorage.getItem('bingo_pattern_count') || 3);
+    if (BINGO_PATTERN_COUNT_OPTIONS.includes(savedPatternCount as (typeof BINGO_PATTERN_COUNT_OPTIONS)[number])) {
+      setBingoPatternCount(savedPatternCount);
+    }
+
+    setAllowLateBingoJoiners(localStorage.getItem('bingo_allow_late_joiners') === '1');
+
+    const savedPrizeLabel = sanitizeBingoSettingValue(localStorage.getItem('bingo_prize_label') || '');
+    if (savedPrizeLabel) setBingoPrizeLabel(savedPrizeLabel);
+
+    const savedAvatar = localStorage.getItem('chat_user_avatar') || getDefaultAvatar(savedName || 'Guest');
+    if (USER_PROFILE_AVATARS.includes(savedAvatar as (typeof USER_PROFILE_AVATARS)[number])) setUserAvatar(savedAvatar);
+
+    const savedProfileColor = localStorage.getItem('chat_profile_color') || 'sky';
+    if (USER_PROFILE_COLORS.some((color) => color.key === savedProfileColor)) setUserProfileColor(savedProfileColor);
+
+    try {
+      const savedVolumes = JSON.parse(localStorage.getItem('bingo_sound_volumes') || '{}');
+      setSoundVolumes({ ...DEFAULT_SOUND_VOLUMES, ...savedVolumes });
+    } catch {
+      setSoundVolumes({ ...DEFAULT_SOUND_VOLUMES });
+    }
   }, []);
 
   useEffect(() => {
@@ -1371,9 +1880,11 @@ export default function HomePage() {
 
     channelRef.current.track({
       user_name: myName,
-      online_at: new Date().toISOString()
+      online_at: new Date().toISOString(),
+      avatar: userAvatar,
+      profile_color: userProfileColor
     });
-  }, [myName]);
+  }, [myName, userAvatar, userProfileColor]);
 
   useEffect(() => {
     if (!myName || !currentPresenceKeyRef.current) return;
@@ -1397,6 +1908,22 @@ export default function HomePage() {
       localStorage.setItem('chat_user_name', uniqueName);
     }
   }, [onlineUsers, myName, isAdminUser]);
+
+
+
+  useEffect(() => {
+    if (!myName || isAdminUser) return;
+    if (!kickedUsers.has(normalizeBingoPlayerName(myName))) return;
+    logoutChatroom();
+    setNameNotice('You were removed from the chatroom by Ripple admin.');
+  }, [kickedUsers, myName, isAdminUser]);
+
+  useEffect(() => {
+    if (!bingoCountdown) return;
+    playCountdownSound();
+    const timer = window.setTimeout(() => setBingoCountdown((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [bingoCountdown]);
 
   useEffect(() => {
     async function loadMessages() {
@@ -1438,7 +1965,9 @@ export default function HomePage() {
           return {
             key,
             name: String(firstPresence?.user_name || 'Guest'),
-            onlineAt: String(firstPresence?.online_at || '')
+            onlineAt: String(firstPresence?.online_at || ''),
+            avatar: String(firstPresence?.avatar || ''),
+            profileColor: String(firstPresence?.profile_color || '')
           };
         });
 
@@ -1495,7 +2024,7 @@ export default function HomePage() {
       postJarvisTrivia();
     };
 
-    const timer = window.setInterval(runJarvisHostLoop, BINGO_CALL_INTERVAL_MS);
+    const timer = window.setInterval(runJarvisHostLoop, BINGO_HOST_TICK_MS);
     window.setTimeout(runJarvisHostLoop, 1200);
 
     return () => window.clearInterval(timer);
@@ -1835,6 +2364,11 @@ export default function HomePage() {
       return;
     }
 
+    if (isMuted) {
+      setNameError('Muted ka muna ni Ripple admin. Hindi ka makakapag-send habang naka-mute.');
+      return;
+    }
+
     const activeSender = cleanName(myName);
     setIsSending(true);
     setInput('');
@@ -1890,6 +2424,8 @@ export default function HomePage() {
         ? 'Showing latest finished Bingo round'
         : 'Waiting for admin Ripple to start a round';
     const tvLastSyncText = bingoTvSyncAt ? `Synced ${formatTime(bingoTvSyncAt)}` : 'Realtime + auto-refresh ready';
+    const playerJoinUrl = typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : '';
+    const latestCountdown = !bingoTvRound ? [...messages].reverse().find((message) => message.event_type === 'bingo_countdown') : null;
 
     return (
       <main className="bingo-tv-shell bingo-tv-fixed-shell">
@@ -1902,6 +2438,14 @@ export default function HomePage() {
             {tvStatusText} • {tvLastSyncText}
           </div>
         </div>
+
+        {bingoCountdown || latestCountdown ? (
+          <section className="bingo-tv-countdown">
+            <strong>Bingo starts in</strong>
+            <span>{bingoCountdown || BINGO_COUNTDOWN_SECONDS}</span>
+            <small>Players, ready your cards!</small>
+          </section>
+        ) : null}
 
         <section className="bingo-tv-live-strip">
           <div>
@@ -1924,9 +2468,12 @@ export default function HomePage() {
 
         <div className={`bingo-tv-live-card ${latestTvBingoCall ? 'has-call' : 'standby'}`} key={`tv-call-${latestTvBingoCall || 'standby'}-${bingoTvCalledNumbers.length}`}>
           <span className={activeBingoRound ? 'live' : 'idle'}>{activeBingoRound ? 'LIVE ROUND' : bingoTvRound ? 'LAST ROUND' : 'STANDBY'}</span>
-          <div className="bingo-tv-call-orb" aria-label={latestTvBingoCall ? `Latest call ${latestTvBingoLabel}` : 'No Bingo call yet'}>
-            <em>{latestTvBingoCall ? latestTvLetter : 'BINGO'}</em>
-            <strong>{latestTvBingoCall ? latestTvNumberText : '--'}</strong>
+          <div className="bingo-draw-machine" aria-label={latestTvBingoCall ? `Latest call ${latestTvBingoLabel}` : 'No Bingo call yet'}>
+            <div className="bingo-ball-track"><span /><span /><span /></div>
+            <div className="bingo-tv-call-orb">
+              <em>{latestTvBingoCall ? latestTvLetter : 'BINGO'}</em>
+              <strong>{latestTvBingoCall ? latestTvNumberText : '--'}</strong>
+            </div>
           </div>
           <small>Bingo Call #{bingoTvCalledNumbers.length || 0}</small>
           <div className="bingo-tv-call-progress" style={{ '--progress': `${tvCallProgress}%` } as CSSProperties}>
@@ -1936,7 +2483,7 @@ export default function HomePage() {
 
         <section className="bingo-tv-panel bingo-tv-pattern-panel">
           <div className="bingo-tv-panel-title">
-            <span>3 Patterns to Win</span>
+            <span>{bingoTvRound?.patterns.length || bingoPatternCount} Patterns to Win</span>
             <small>Official round patterns</small>
           </div>
           {bingoTvRound ? (
@@ -2038,6 +2585,22 @@ export default function HomePage() {
               <span>Winner Score</span>
               <strong>+{BINGO_WIN_SCORE}</strong>
             </div>
+            <div>
+              <span>Prize</span>
+              <strong>{bingoTvRound?.prizeLabel || BINGO_DEFAULT_PRIZE}</strong>
+            </div>
+            <div>
+              <span>Call Speed</span>
+              <strong>{formatBingoSeconds(bingoTvRound?.callIntervalMs || BINGO_CALL_INTERVAL_MS)}</strong>
+            </div>
+          </div>
+          <div className="bingo-tv-qr-card">
+            <QrCode size={22} />
+            <div>
+              <strong>Scan to join</strong>
+              <small>{playerJoinUrl || 'Open the chatroom link'}</small>
+            </div>
+            {playerJoinUrl ? <img alt="Chatroom QR code" src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeQrData(playerJoinUrl)}`} /> : null}
           </div>
           <div className="bingo-tv-actions">
             <button type="button" onClick={enableBingoSounds}>
@@ -2098,16 +2661,138 @@ export default function HomePage() {
               </button>
             </header>
 
+            {isAdminUser ? (
+              <section className="bingo-admin-panel" aria-label="Ripple admin Bingo controls">
+                <div className="bingo-admin-heading">
+                  <span><Settings size={15} /> Ripple Admin Control Panel</span>
+                  <small>{activeBingoRound ? `Live: Round ${activeBingoRound.roundId}` : bingoCountdown ? `Countdown: ${bingoCountdown}` : 'Ready to configure next round'}</small>
+                </div>
+
+                <div className="bingo-admin-grid extended">
+                  <label>
+                    <span>Call speed</span>
+                    <select value={bingoCallSpeedMs} onChange={(event) => changeBingoCallSpeed(event.target.value)} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown)}>
+                      {BINGO_SPEED_OPTIONS.map((speed) => (
+                        <option key={speed} value={speed}>{formatBingoSeconds(speed)}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Patterns</span>
+                    <select value={bingoPatternCount} onChange={(event) => changeBingoPatternCount(event.target.value)} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown)}>
+                      {BINGO_PATTERN_COUNT_OPTIONS.map((count) => (
+                        <option key={count} value={count}>{count} pattern{count > 1 ? 's' : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Winner limit</span>
+                    <select value={bingoWinnerLimit} onChange={(event) => changeBingoWinnerLimit(event.target.value)} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown)}>
+                      {BINGO_WINNER_LIMIT_OPTIONS.map((limit) => (
+                        <option key={limit} value={limit}>{limit} winner{limit > 1 ? 's' : ''}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="bingo-admin-prize">
+                    <span>Prize / round label</span>
+                    <input value={bingoPrizeLabel} onChange={(event) => changeBingoPrizeLabel(event.target.value)} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown)} placeholder="Bingo Champion" />
+                  </label>
+                  <label className="bingo-admin-toggle">
+                    <span>Late joiners</span>
+                    <button type="button" className={allowLateBingoJoiners ? 'active' : ''} onClick={() => changeAllowLateBingoJoiners(!allowLateBingoJoiners)} disabled={Boolean(activeBingoRound) || Boolean(bingoCountdown)}>
+                      {allowLateBingoJoiners ? 'Allowed' : 'Locked'}
+                    </button>
+                  </label>
+                </div>
+
+                <div className="bingo-admin-actions wide">
+                  <button type="button" onClick={startBingoRound}>
+                    <Play size={15} /> {activeBingoRound ? 'Open BingoTV' : bingoCountdown ? 'Counting...' : 'Start Bingo'}
+                  </button>
+                  <button type="button" onClick={openBingoTvScreen}>
+                    <Monitor size={15} /> BingoTV
+                  </button>
+                  <button type="button" onClick={endBingoRound} disabled={!activeBingoRound} className="danger">
+                    <StopCircle size={15} /> End Bingo
+                  </button>
+                  <button type="button" onClick={resetBingoCalls} disabled={!activeBingoRound}>
+                    <RotateCcw size={15} /> Reset Calls
+                  </button>
+                  <button type="button" onClick={resetScoreDisplay}>
+                    <Trophy size={15} /> Reset Scores
+                  </button>
+                  <button type="button" onClick={clearChatDisplay}>
+                    <Trash2 size={15} /> Clear Chat
+                  </button>
+                </div>
+
+                <div className="bingo-admin-manager-grid">
+                  <div className="bingo-admin-history full-records">
+                    <p><History size={14} /> View Winners / Records</p>
+                    {bingoWinnerRecords.length ? (
+                      bingoWinnerRecords.slice(0, 6).map((record, index) => (
+                        <small key={`${record.roundId}-${record.name}-${index}`}>
+                          {formatTime(record.time)} · {record.name || 'Winner'} · Round {record.roundId || '-'} · {record.pattern} · +{record.score} · {record.verification}
+                        </small>
+                      ))
+                    ) : (
+                      <small>No verified Bingo winner yet.</small>
+                    )}
+                  </div>
+
+                  <div className="bingo-admin-users">
+                    <p><UserCog size={14} /> User actions</p>
+                    {userList.filter((user) => !isAdminUserName(user.name)).slice(0, 8).map((user) => {
+                      const muted = mutedUsers.has(normalizeBingoPlayerName(user.name));
+                      return (
+                        <div key={`admin-user-${user.key}-${user.name}`} className="bingo-admin-user-row">
+                          <span>{user.avatar || getDefaultAvatar(user.name)} {user.name}</span>
+                          <button type="button" onClick={() => muted ? unmuteUser(user.name) : muteUser(user.name)}>
+                            {muted ? <Volume2 size={13} /> : <VolumeX size={13} />} {muted ? 'Unmute' : 'Mute'}
+                          </button>
+                          <button type="button" onClick={() => kickUser(user.name)} className="danger"><UserX size={13} /> Kick</button>
+                          <button type="button" onClick={() => setAdminSelectedPlayer(user.name)}><Eye size={13} /> Card</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="bingo-admin-card-viewer">
+                  <p><Eye size={14} /> Player Card Viewer: <strong>{adminCardPlayer || 'No player selected'}</strong></p>
+                  {adminPreviewCard ? (
+                    <div className="admin-mini-bingo-card">
+                      {['B', 'I', 'N', 'G', 'O'].map((letter) => <strong key={`admin-head-${letter}`}>{letter}</strong>)}
+                      {adminPreviewCard.flatMap((row, rowIndex) => row.map((value, columnIndex) => {
+                        const called = value === 'FREE' || (typeof value === 'number' && (bingoTvRound ? new Set(getBingoCalledNumbers(messages, bingoTvRound.roundId)).has(value) : false));
+                        return <span key={`admin-card-${rowIndex}-${columnIndex}`} className={called ? 'called' : ''}>{value}</span>;
+                      }))}
+                    </div>
+                  ) : <small>Start a round or select a player to preview their card.</small>}
+                </div>
+
+                <div className="sound-control-panel">
+                  <p><Volume2 size={14} /> Sound Control Panel</p>
+                  {(Object.keys(DEFAULT_SOUND_VOLUMES) as SoundKey[]).map((key) => (
+                    <label key={`sound-${key}`}>
+                      <span>{key}</span>
+                      <input type="range" min="0" max="1" step="0.05" value={soundVolumes[key]} onChange={(event) => changeSoundVolume(key, event.target.value)} />
+                    </label>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             {activeBingoRound ? (
               <>
                 <div className="bingo-status-card">
                   <strong>Round {activeBingoRound.roundId}</strong>
                   <span>Current call: {latestBingoCall ? numberToBingoLabel(latestBingoCall) : 'Waiting...'}</span>
-                  <small>Next call auto-hosted by Jarvis every {Math.round(BINGO_CALL_INTERVAL_MS / 1000)} seconds.</small>
+                  <small>Prize: {activeBingoRound.prizeLabel} · Calls every {formatBingoSeconds(activeBingoRound.callIntervalMs)} · Winners {activeBingoWinners.length}/{activeBingoRound.winnerLimit}</small>
                 </div>
 
                 <div className="bingo-patterns">
-                  <p className="bingo-section-title">3 patterns to win</p>
+                  <p className="bingo-section-title">{activeBingoRound.patterns.length} pattern{activeBingoRound.patterns.length > 1 ? 's' : ''} to win</p>
                   {activeBingoRound.patterns.map((pattern) => {
                     const previewCells = getBingoPreviewCells(pattern.key);
 
@@ -2299,6 +2984,30 @@ export default function HomePage() {
           {nameNotice ? <p className="name-feedback success">{nameNotice}</p> : null}
         </div>
 
+        {myName ? (
+          <div className="profile-card">
+            <p><UserCog size={14} /> Profile + Avatar</p>
+            <div className="avatar-picker">
+              {USER_PROFILE_AVATARS.map((avatar) => (
+                <button key={avatar} type="button" className={userAvatar === avatar ? 'active' : ''} onClick={() => changeUserAvatar(avatar)}>{avatar}</button>
+              ))}
+            </div>
+            <div className="profile-color-picker">
+              {USER_PROFILE_COLORS.map((color) => (
+                <button
+                  key={color.key}
+                  type="button"
+                  className={userProfileColor === color.key ? 'active' : ''}
+                  style={{ '--profile-color': color.color } as CSSProperties}
+                  onClick={() => changeUserProfileColor(color.key)}
+                >
+                  {color.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="list-header">
           <span><Users size={16} /> Users</span>
           <strong>{onlineCount} online</strong>
@@ -2306,7 +3015,7 @@ export default function HomePage() {
 
         <div className="user-list" role="listbox" aria-label="Chat users">
           {userList.map((user) => {
-            const userAccentStyle = getUserAccentStyle(user.name);
+            const userAccentStyle = getProfileColorStyle(user.profileColor || '', user.name);
 
             return (
               <button
@@ -2316,7 +3025,7 @@ export default function HomePage() {
                 style={userAccentStyle}
                 onClick={() => selectSender(user.name)}
               >
-                <span className="user-avatar"><UserRound size={16} /></span>
+                <span className="user-avatar">{user.avatar || getDefaultAvatar(user.name)}</span>
                 <span>
                   <strong className="name-color">{user.name}</strong>
                   <small>{selectedSender === user.name ? 'Selected participant' : 'Click to highlight'} · Score: {scoreMap.get(user.name) || 0}</small>
@@ -2415,14 +3124,14 @@ export default function HomePage() {
               {nameError ? <p className="name-feedback error">{nameError}</p> : null}
               {nameNotice ? <p className="name-feedback success">{nameNotice}</p> : null}
             </div>
-          ) : messages.length === 0 ? (
+          ) : displayedMessages.length === 0 ? (
             <div className="empty-state">
               <Bot size={42} />
               <h3>Start the conversation</h3>
               <p>Mag-message ka lang. Hindi na kailangan ng /ai — automatic nang sasagot si Jarvis.</p>
             </div>
           ) : (
-            messages.map((message) => {
+            displayedMessages.map((message) => {
               const isJarvis = message.user_name === JARVIS_NAME;
               const isSystem = message.user_name === 'System';
               const isOwn = !message.is_ai && message.user_name === senderName;
@@ -2458,10 +3167,10 @@ export default function HomePage() {
           <input
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            placeholder={myName ? 'Type a message... Jarvis will join the conversation' : 'Enter your name first to unlock chat'}
-            disabled={!myName}
+            placeholder={isMuted ? 'Muted by Ripple admin' : myName ? 'Type a message... Jarvis will join the conversation' : 'Enter your name first to unlock chat'}
+            disabled={!myName || isMuted}
           />
-          <button type="submit" disabled={!myName || !input.trim() || isSending}>
+          <button type="submit" disabled={!myName || isMuted || !input.trim() || isSending}>
             {isSending ? <Loader2 className="spin" size={18} /> : <Send size={18} />}
             <span className="send-label">Send</span>
           </button>

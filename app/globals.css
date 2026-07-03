@@ -3325,3 +3325,455 @@ button {
     overflow: auto !important;
   }
 }
+
+/* v13.9 Admin Control Panel, Round Settings, and Winner History */
+.bingo-admin-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  border-radius: 20px;
+  background:
+    linear-gradient(145deg, rgba(10, 124, 255, 0.10), rgba(124, 58, 237, 0.12)),
+    #ffffff;
+  padding: 12px;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
+}
+
+.bingo-admin-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bingo-admin-heading span,
+.bingo-admin-history p {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #3730a3;
+  font-size: 0.82rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bingo-admin-heading small,
+.bingo-admin-lock,
+.bingo-admin-history small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.bingo-admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.bingo-admin-grid label {
+  display: grid;
+  gap: 5px;
+}
+
+.bingo-admin-grid label span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bingo-admin-grid select,
+.bingo-admin-grid input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text);
+  padding: 9px 10px;
+  font-weight: 850;
+  outline: none;
+}
+
+.bingo-admin-grid select:disabled,
+.bingo-admin-grid input:disabled {
+  cursor: not-allowed;
+  background: #eef2f7;
+  color: #64748b;
+}
+
+.bingo-admin-prize {
+  grid-column: 1 / -1;
+}
+
+.bingo-admin-lock {
+  border-radius: 14px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 8px 10px;
+  font-weight: 800;
+}
+
+.bingo-admin-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.72fr;
+  gap: 7px;
+}
+
+.bingo-admin-actions button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #0a7cff, #7c3aed);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.bingo-admin-actions button.danger {
+  background: linear-gradient(145deg, #ef4444, #be123c);
+}
+
+.bingo-admin-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.bingo-admin-history {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid rgba(124, 58, 237, 0.16);
+  padding-top: 9px;
+}
+
+.bingo-admin-history small {
+  display: block;
+  max-height: 3.2em;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 7px 8px;
+  font-weight: 760;
+}
+
+@media (max-width: 560px) {
+  .bingo-admin-grid,
+  .bingo-admin-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .bingo-admin-heading {
+    flex-direction: column;
+  }
+}
+
+/* v13.9 BingoTV extra stats fit */
+.bingo-tv-stat-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bingo-tv-stat-grid div:nth-last-child(-n+2) strong {
+  font-size: clamp(0.92rem, 1.45vw, 1.22rem);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* v14 complete admin + BingoTV upgrades */
+.profile-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.profile-card p,
+.sound-control-panel p,
+.bingo-admin-users p,
+.bingo-admin-card-viewer p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.avatar-picker,
+.profile-color-picker,
+.bingo-admin-actions.wide {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.avatar-picker button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  font-size: 1rem;
+}
+
+.avatar-picker button.active,
+.profile-color-picker button.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(10, 124, 255, 0.12);
+}
+
+.profile-color-picker {
+  margin-top: 8px;
+}
+
+.profile-color-picker button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--profile-color) 13%, white);
+  color: var(--profile-color);
+  padding: 6px 9px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.bingo-admin-grid.extended {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bingo-admin-toggle button {
+  width: 100%;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 10px;
+  font-weight: 900;
+}
+
+.bingo-admin-toggle button.active {
+  border-color: #10b981;
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.bingo-admin-actions.wide button {
+  flex: 1 1 130px;
+  justify-content: center;
+}
+
+.bingo-admin-manager-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.bingo-admin-users,
+.bingo-admin-card-viewer,
+.sound-control-panel {
+  border: 1px solid rgba(199, 210, 254, 0.85);
+  border-radius: 16px;
+  background: rgba(238, 242, 255, 0.72);
+  padding: 10px;
+}
+
+.bingo-admin-user-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 5px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid rgba(199, 210, 254, 0.6);
+}
+
+.bingo-admin-user-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.bingo-admin-user-row button {
+  border: none;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #3730a3;
+  padding: 7px 8px;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.bingo-admin-user-row button.danger,
+.bingo-admin-actions button.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.admin-mini-bingo-card {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+}
+
+.admin-mini-bingo-card strong,
+.admin-mini-bingo-card span {
+  display: grid;
+  place-items: center;
+  min-height: 28px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.admin-mini-bingo-card strong {
+  background: #111827;
+  color: white;
+}
+
+.admin-mini-bingo-card span.called {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #60a5fa;
+}
+
+.sound-control-panel label {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.sound-control-panel input[type='range'] {
+  width: 100%;
+}
+
+.full-records small {
+  display: block;
+  padding: 5px 0;
+  border-top: 1px solid rgba(199, 210, 254, 0.55);
+}
+
+.bingo-tv-countdown {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 150px;
+  border-radius: 28px;
+  background: radial-gradient(circle, #fde68a 0%, #f97316 38%, #7c2d12 100%);
+  color: white;
+  box-shadow: 0 0 45px rgba(249, 115, 22, 0.55);
+  animation: tv-countdown-pulse 1s ease-in-out infinite;
+}
+
+.bingo-tv-countdown strong {
+  font-size: clamp(1.4rem, 2.2vw, 2.4rem);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.bingo-tv-countdown span {
+  font-size: clamp(4.5rem, 10vw, 10rem);
+  font-weight: 1000;
+  line-height: 0.9;
+}
+
+.bingo-draw-machine {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(36vh, 330px);
+  height: min(36vh, 330px);
+  margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, rgba(255,255,255,.7), rgba(59,130,246,.25) 34%, rgba(15,23,42,.92) 70%);
+  box-shadow: inset 0 0 28px rgba(255,255,255,.24), 0 0 42px rgba(14,165,233,.35);
+  overflow: hidden;
+}
+
+.bingo-ball-track {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  animation: bingo-machine-spin 3.5s linear infinite;
+}
+
+.bingo-ball-track span {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fef3c7, #f59e0b);
+  box-shadow: 0 0 18px rgba(245,158,11,.55);
+}
+
+.bingo-ball-track span:nth-child(1) { top: 0; left: 50%; }
+.bingo-ball-track span:nth-child(2) { right: 4%; top: 62%; background: linear-gradient(145deg, #dbeafe, #2563eb); }
+.bingo-ball-track span:nth-child(3) { left: 4%; top: 62%; background: linear-gradient(145deg, #fce7f3, #db2777); }
+
+.bingo-tv-qr-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.18);
+}
+
+.bingo-tv-qr-card strong,
+.bingo-tv-qr-card small {
+  display: block;
+}
+
+.bingo-tv-qr-card img {
+  width: min(9vw, 120px);
+  height: min(9vw, 120px);
+  border-radius: 12px;
+  background: white;
+  padding: 5px;
+}
+
+@keyframes tv-countdown-pulse {
+  0%, 100% { transform: scale(1); filter: saturate(1); }
+  50% { transform: scale(1.015); filter: saturate(1.35); }
+}
+
+@keyframes bingo-machine-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (min-width: 1200px) {
+  .bingo-admin-manager-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .bingo-admin-grid.extended,
+  .bingo-admin-user-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bingo-admin-user-row button {
+    width: 100%;
+  }
+}
