@@ -1421,6 +1421,49 @@ export default function HomePage() {
       .slice(0, 260);
   }
 
+  function getJarvisMaleTagalogVoice() {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    const tagalogHints = ['fil', 'tl', 'ph', 'tagalog', 'filipino', 'philippines'];
+    const maleNameHints = [
+      'male',
+      'man',
+      'boy',
+      'james',
+      'david',
+      'mark',
+      'daniel',
+      'george',
+      'richard',
+      'alex',
+      'fred',
+      'ralph',
+      'thomas'
+    ];
+    const femaleNameHints = ['female', 'woman', 'girl', 'zira', 'hazel', 'susan', 'samantha', 'victoria', 'karen'];
+
+    const scoredVoices = voices.map((voice) => {
+      const label = `${voice.name} ${voice.lang} ${voice.voiceURI}`.toLowerCase();
+      let score = 0;
+
+      if (tagalogHints.some((hint) => label.includes(hint))) score += 80;
+      if (voice.lang.toLowerCase().startsWith('fil') || voice.lang.toLowerCase().startsWith('tl')) score += 60;
+      if (voice.lang.toLowerCase().includes('ph')) score += 45;
+      if (maleNameHints.some((hint) => label.includes(hint))) score += 25;
+      if (femaleNameHints.some((hint) => label.includes(hint))) score -= 45;
+      if (voice.localService) score += 5;
+      if (voice.default) score += 2;
+
+      return { voice, score };
+    });
+
+    scoredVoices.sort((a, b) => b.score - a.score);
+    return scoredVoices[0]?.voice || null;
+  }
+
   function speakJarvisText(text: string, force = false) {
     if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
     if (!('speechSynthesis' in window)) {
@@ -1432,10 +1475,19 @@ export default function HomePage() {
     if (!voiceText) return;
 
     try {
+      const selectedVoice = getJarvisMaleTagalogVoice();
       const utterance = new SpeechSynthesisUtterance(voiceText);
-      utterance.lang = 'en-PH';
-      utterance.rate = 0.94;
-      utterance.pitch = 0.95;
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang || 'fil-PH';
+      } else {
+        utterance.lang = 'fil-PH';
+      }
+
+      // Lower pitch + slower pace gives Jarvis a more male, Tagalog-friendly delivery.
+      utterance.rate = 0.86;
+      utterance.pitch = 0.72;
       utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
@@ -1480,11 +1532,15 @@ export default function HomePage() {
 
   function enableJarvisVoice() {
     if (typeof window === 'undefined') return;
+    if ('speechSynthesis' in window) {
+      // Some browsers load voices only after this call/user interaction.
+      window.speechSynthesis.getVoices();
+    }
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
-    setLiveKitVoiceStatus('Jarvis voice enabled');
-    speakJarvisText('Jarvis voice is now enabled.', true);
+    setLiveKitVoiceStatus('Jarvis male Tagalog voice enabled');
+    speakJarvisText('Naka on na ang boses ni Jarvis. Lalaking boses ako at Tagalog ang tono.', true);
     void connectLiveKitVoiceRoom();
   }
 

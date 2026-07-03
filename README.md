@@ -1,8 +1,8 @@
-# Realtime Chatroom Jarvis v14.7
+# Realtime Chatroom Jarvis v15.2
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, at Jarvis-hosted Bingo.
 
-## New in v14.7
+## New in v15.2
 
 - Full Ripple-only Admin Control Panel.
 - Admin buttons: Start Bingo, End Bingo, Reset Calls, Reset Scores display, Kick User, Mute/Unmute User, Clear Chat, and View Winners.
@@ -24,6 +24,11 @@ Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, 
 - Round countdown animation before Bingo starts.
 - Animated Bingo number draw machine on BingoTV.
 - User Profile + Avatar + profile color.
+- Jarvis Voice button with browser speech output for Jarvis messages and Bingo calls.
+- Jarvis browser speech now prefers a male Tagalog/Filipino voice when available.
+- Jarvis fallback speech uses `fil-PH`, slower rate, and lower pitch for a more male Tagalog-style delivery.
+- LiveKit voice-room token endpoint at `app/api/livekit-token/route.ts`.
+- LiveKit credentials stay server-side in environment variables; never place API secret in browser code.
 
 - Player multi-card options:
   - users can choose 1 to 4 Bingo cards maximum
@@ -59,6 +64,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 NVIDIA_API_KEY=your-nvidia-api-key
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_MODEL=meta/llama-3.1-8b-instruct
+
+LIVEKIT_URL=wss://your-livekit-project.livekit.cloud
+LIVEKIT_API_KEY=your-livekit-api-key
+LIVEKIT_API_SECRET=your-livekit-api-secret
 ```
 
 Run:
@@ -77,7 +86,7 @@ http://localhost:3000
 ## Deploy
 
 ```bash
-git add app/page.tsx app/globals.css README.md
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts package.json README.md
 git commit -m "Add player multi card Bingo options"
 git push
 vercel --prod
@@ -153,3 +162,18 @@ This version keeps using the existing `messages`, `user_scores`, and `score_even
 - Added machine-readable `[PATTERN_KEYS: ...]` metadata to Bingo start events so every device reads the same official pattern keys.
 - Kept center card value as `★` for all generated player cards and admin preview cards.
 - Start a fresh new Bingo round after deploy so old round data does not keep the previous pattern list.
+
+
+## v15.2 Jarvis Male Tagalog Voice
+
+- Jarvis Voice now searches the browser speech voices for Filipino/Tagalog/Philippines voices first, then male-sounding voice names as fallback.
+- If the exact Filipino male voice is not installed on the device/TV browser, the app uses `fil-PH` language with lower pitch and slower rate to keep the delivery closer to a male Tagalog accent.
+- On some Smart TVs and phones, available voices depend on the device/browser voice packs. Install or enable Filipino/Tagalog voice packs when available for best result.
+
+## Jarvis Voice / LiveKit Notes
+
+- Click **Jarvis Voice** or **Enable Sounds** on BingoTV to allow browser audio.
+- Browser autoplay rules require a user click before speech/audio starts.
+- The included LiveKit token route prepares the app for a LiveKit voice room. A separate LiveKit Agent/TTS worker can join the same room later for true server-side Jarvis voice.
+- The current app also uses browser SpeechSynthesis so Jarvis can speak immediately on the device where voice is enabled.
+- Keep `LIVEKIT_API_SECRET` only in `.env.local` and Vercel Environment Variables. Do not commit or paste it in client files.
