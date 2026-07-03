@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import { Bot, ChevronRight, Gamepad2, Loader2, MessageCircle, Monitor, Play, Send, ShieldCheck, Sparkles, Trophy, UserRound, Users, Volume2 } from 'lucide-react';
+import { Bot, ChevronRight, Gamepad2, KeyRound, Loader2, MessageCircle, Monitor, Play, Send, ShieldCheck, Sparkles, Trophy, UserRound, Users, Volume2 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 type Message = {
@@ -181,7 +181,9 @@ const jarvisTrivia = [
 ];
 
 const RESERVED_NAMES = new Set(['jarvis', 'system', 'guest', 'admin', 'administrator', 'moderator']);
-const ADMIN_NAMES = new Set(['ripple']);
+const ADMIN_DISPLAY_NAME = 'Ripple';
+const ADMIN_PASSWORD = 'rip123';
+const ADMIN_NAMES = new Set([ADMIN_DISPLAY_NAME.toLowerCase()]);
 
 function cleanName(name: string) {
   return name.trim().replace(/\s+/g, ' ').slice(0, 40) || 'Guest';
@@ -208,6 +210,10 @@ function sanitizeParticipantName(name: string) {
 
 function stripNumberSuffix(name: string) {
   return name.replace(/\s+\d+$/, '').trim() || name.trim();
+}
+
+function isAdminLoginName(name: string) {
+  return stripNumberSuffix(cleanName(name)).toLowerCase() === ADMIN_DISPLAY_NAME.toLowerCase();
 }
 
 function isReservedName(name: string) {
@@ -644,6 +650,8 @@ export default function HomePage() {
   const [selectedSender, setSelectedSender] = useState('');
   const [nameError, setNameError] = useState('');
   const [nameNotice, setNameNotice] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [statusText, setStatusText] = useState('Jarvis is online');
@@ -672,7 +680,11 @@ export default function HomePage() {
 
   const onlineCount = onlineUsers.length;
   const senderName = myName;
-  const isAdminUser = useMemo(() => isAdminUserName(myName), [myName]);
+  const isAdminLoginAttempt = useMemo(() => isAdminLoginName(nameDraft), [nameDraft]);
+  const isAdminUser = useMemo(
+    () => isAdminUserName(myName) && isAdminAuthenticated,
+    [myName, isAdminAuthenticated]
+  );
 
   const topScore = useMemo(() => sortScores(scores)[0] || null, [scores]);
 
@@ -769,23 +781,44 @@ export default function HomePage() {
     }
 
     const baseName = stripNumberSuffix(cleanedName);
+    const wantsAdminAccess = isAdminLoginName(baseName);
 
     if (isReservedName(baseName)) {
       setNameError('Reserved ang name na iyan. Gumamit ng totoong participant name.');
       return '';
     }
 
-    const uniqueName = makeUniqueParticipantName(baseName, getTakenParticipantNames(), myName);
+    if (wantsAdminAccess && adminPassword.trim() !== ADMIN_PASSWORD) {
+      setIsAdminAuthenticated(false);
+      localStorage.removeItem('chat_admin_verified');
+      setNameError('Admin password required para mag-login bilang Ripple.');
+      return '';
+    }
+
+    const uniqueName = wantsAdminAccess
+      ? ADMIN_DISPLAY_NAME
+      : makeUniqueParticipantName(baseName, getTakenParticipantNames(), myName);
 
     setMyName(uniqueName);
     setNameDraft(uniqueName);
     setSelectedSender(uniqueName);
     localStorage.setItem('chat_user_name', uniqueName);
 
-    if (uniqueName !== cleanedName) {
-      setNameNotice(`May kaparehong name, kaya ginawa nating: ${uniqueName}`);
+    if (wantsAdminAccess) {
+      setIsAdminAuthenticated(true);
+      localStorage.setItem('chat_admin_verified', '1');
+      setAdminPassword('');
+      setNameNotice('Ripple admin verified. Admin tools are now unlocked on this device.');
     } else {
-      setNameNotice('Name confirmed. Pwede ka nang mag-chat.');
+      setIsAdminAuthenticated(false);
+      localStorage.removeItem('chat_admin_verified');
+      setAdminPassword('');
+
+      if (uniqueName !== cleanedName) {
+        setNameNotice(`May kaparehong name, kaya ginawa nating: ${uniqueName}`);
+      } else {
+        setNameNotice('Name confirmed. Pwede ka nang mag-chat.');
+      }
     }
 
     return uniqueName;
@@ -910,6 +943,9 @@ export default function HomePage() {
 
     channelRef.current?.untrack();
     localStorage.removeItem('chat_user_name');
+    localStorage.removeItem('chat_admin_verified');
+    setIsAdminAuthenticated(false);
+    setAdminPassword('');
     setMyName('');
     setNameDraft('');
     setSelectedSender('');
@@ -1140,7 +1176,7 @@ export default function HomePage() {
     }
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [onlineUsers, myName]);
+  }, [onlineUsers, myName, isAdminUser]);
 
   const recentMessagesForJarvis = useMemo(
     () =>
@@ -1227,11 +1263,25 @@ export default function HomePage() {
 
   useEffect(() => {
     const savedName = sanitizeParticipantName(localStorage.getItem('chat_user_name') || '');
+    const savedAdminVerified = localStorage.getItem('chat_admin_verified') === '1';
 
     if (savedName && !isReservedName(stripNumberSuffix(savedName))) {
-      setMyName(savedName);
-      setNameDraft(savedName);
-      setSelectedSender(savedName);
+      if (isAdminLoginName(savedName)) {
+        if (savedAdminVerified) {
+          setIsAdminAuthenticated(true);
+          setMyName(ADMIN_DISPLAY_NAME);
+          setNameDraft(ADMIN_DISPLAY_NAME);
+          setSelectedSender(ADMIN_DISPLAY_NAME);
+        } else {
+          localStorage.removeItem('chat_user_name');
+          localStorage.removeItem('chat_admin_verified');
+        }
+      } else {
+        setIsAdminAuthenticated(false);
+        setMyName(savedName);
+        setNameDraft(savedName);
+        setSelectedSender(savedName);
+      }
     }
 
     const savedMarkColor = localStorage.getItem('bingo_mark_color') || 'blue';
@@ -1310,6 +1360,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!myName || !currentPresenceKeyRef.current) return;
+    if (isAdminUser) return;
 
     const duplicateOnlineUser = onlineUsers.find(
       (user) =>
@@ -1328,7 +1379,7 @@ export default function HomePage() {
       setNameNotice(`May kaparehong online user, kaya ginawa nating: ${uniqueName}`);
       localStorage.setItem('chat_user_name', uniqueName);
     }
-  }, [onlineUsers, myName]);
+  }, [onlineUsers, myName, isAdminUser]);
 
   useEffect(() => {
     async function loadMessages() {
@@ -2213,6 +2264,24 @@ export default function HomePage() {
             />
             <button type="button" onClick={saveName}>Join</button>
           </div>
+          {isAdminLoginAttempt ? (
+            <div className="admin-password-card">
+              <label htmlFor="admin-password-sidebar"><KeyRound size={14} /> Ripple admin password</label>
+              <input
+                id="admin-password-sidebar"
+                type="password"
+                value={adminPassword}
+                onChange={(event) => {
+                  setAdminPassword(event.target.value);
+                  setNameError('');
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') saveName();
+                }}
+                placeholder="Enter admin password"
+              />
+            </div>
+          ) : null}
           {nameError ? <p className="name-feedback error">{nameError}</p> : null}
           {nameNotice ? <p className="name-feedback success">{nameNotice}</p> : null}
         </div>
@@ -2281,7 +2350,7 @@ export default function HomePage() {
                 <Monitor size={17} /> BingoTV
               </button>
             ) : null}
-            <div className="sender-pill">Logged in as: <strong>{senderName || 'Name required'}</strong></div>
+            <div className="sender-pill">Logged in as: <strong>{senderName || 'Name required'}</strong>{isAdminUser ? <span className="admin-verified-badge">Admin verified</span> : null}</div>
             {myName ? (
               <button type="button" className="logout-button" onClick={logoutChatroom}>
                 Logout
@@ -2311,6 +2380,25 @@ export default function HomePage() {
                 />
                 <button type="button" onClick={saveName}>Join chat</button>
               </div>
+              {isAdminLoginAttempt ? (
+                <div className="admin-password-card gate-admin-password">
+                  <label htmlFor="admin-password-gate"><KeyRound size={14} /> Ripple admin password</label>
+                  <input
+                    id="admin-password-gate"
+                    type="password"
+                    value={adminPassword}
+                    onChange={(event) => {
+                      setAdminPassword(event.target.value);
+                      setNameError('');
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') saveName();
+                    }}
+                    placeholder="Enter admin password"
+                  />
+                  <small>Admin tools like BingoTV and Start Bingo unlock only after verification.</small>
+                </div>
+              ) : null}
               {nameError ? <p className="name-feedback error">{nameError}</p> : null}
               {nameNotice ? <p className="name-feedback success">{nameNotice}</p> : null}
             </div>

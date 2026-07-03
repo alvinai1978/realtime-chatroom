@@ -104,3 +104,12 @@ vercel --prod
 - Current Bingo call now has a colorful animated call orb, animated latest-number highlight on the master board, and recent-call strip.
 - BingoTV layout has better Smart TV auto-fit for 75-inch/large 16:9 displays, with scroll fallback for smaller TVs and browser zoom differences.
 - BingoTV shows connection/sync status, latest Jarvis Bingo event, next hidden call, patterns, called numbers, eligible players, and verification reports.
+
+## v13.5 Admin password gate
+
+- The admin account is now locked to the exact display name `Ripple`.
+- When someone types `Ripple`, the app shows a password field before allowing the login.
+- The admin password is `rip123`.
+- Only a verified Ripple admin can see the BingoTV button and start/administer Bingo rounds.
+- Ripple can verify on any device such as TV, mobile, tablet, or laptop by typing `Ripple` then entering the password.
+- Normal users cannot unlock admin tools just by typing Ripple.
