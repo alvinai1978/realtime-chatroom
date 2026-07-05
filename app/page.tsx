@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
-import { Bot, ChevronRight, Eye, Gamepad2, History, KeyRound, Loader2, MessageCircle, Monitor, Play, QrCode, RotateCcw, Send, Settings, ShieldCheck, Sparkles, StopCircle, Trash2, Trophy, UserCog, UserRound, UserX, Users, Volume2, VolumeX } from 'lucide-react';
+import type { CSSProperties, ChangeEvent, FormEvent } from 'react';
+import { Bot, ChevronRight, Eye, Gamepad2, History, KeyRound, Loader2, MessageCircle, Monitor, Music, Play, QrCode, RotateCcw, Send, Settings, ShieldCheck, Sparkles, StopCircle, Trash2, Trophy, UserCog, UserRound, UserX, Users, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 type Message = {
@@ -141,7 +141,11 @@ const USER_PROFILE_COLORS = [
   { key: 'amber', label: 'Amber', color: '#d97706', soft: '#fef3c7' },
   { key: 'slate', label: 'Slate', color: '#334155', soft: '#e2e8f0' }
 ] as const;
-const DEFAULT_SOUND_VOLUMES = { call: 0.8, winner: 0.85, invalid: 0.55, confetti: 0.8, countdown: 0.75 } as const;
+const DEFAULT_SOUND_VOLUMES = { call: 0.8, winner: 0.85, invalid: 0.55, confetti: 0.8, countdown: 0.75, music: 0.22 } as const;
+const DEFAULT_BINGO_MUSIC_SRC = '/bingo-music.mp3';
+const BINGO_BACKGROUND_MUSIC_STORAGE_KEY = 'bingo_background_music_enabled';
+const WEBOS_TTS_STORAGE_KEY = 'ripple_webos_tts_mode';
+const WEBOS_VOICE_PACK_BASE = '/voices/bingo-en';
 type SoundKey = keyof typeof DEFAULT_SOUND_VOLUMES;
 const BINGO_COLUMNS = [
   { letter: 'B', min: 1, max: 15 },
@@ -259,6 +263,19 @@ function isBingoTvUrl() {
 
   const params = new URLSearchParams(window.location.search);
   return params.get('bingoTV') === '1' || params.get('view') === 'bingo-tv';
+}
+
+function isLikelyWebOsTv() {
+  if (typeof navigator === 'undefined') return false;
+
+  const userAgent = navigator.userAgent.toLowerCase();
+  return (
+    userAgent.includes('web0s') ||
+    userAgent.includes('webos') ||
+    userAgent.includes('webappmanager') ||
+    userAgent.includes('lg browser') ||
+    userAgent.includes('smarttv')
+  );
 }
 
 function sanitizeParticipantName(name: string) {
@@ -1176,8 +1193,12 @@ export default function HomePage() {
   const [isBingoTvMode, setIsBingoTvMode] = useState(() => isBingoTvUrl());
   const [bingoTvSyncAt, setBingoTvSyncAt] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [bingoMusicEnabled, setBingoMusicEnabled] = useState(false);
+  const [bingoMusicStatus, setBingoMusicStatus] = useState('Music off');
+  const [bingoMusicSrc, setBingoMusicSrc] = useState(DEFAULT_BINGO_MUSIC_SRC);
   const [jarvisVoiceEnabled, setJarvisVoiceEnabled] = useState(false);
   const [liveKitVoiceStatus, setLiveKitVoiceStatus] = useState('Voice off');
+  const [webOsTtsMode, setWebOsTtsMode] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const currentPresenceKeyRef = useRef('');
@@ -1190,6 +1211,9 @@ export default function HomePage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastBingoCallSoundRef = useRef('');
   const lastJarvisSpokenMessageIdRef = useRef<number | null>(null);
+  const bingoMusicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceAudioSequenceRef = useRef(0);
+  const bingoMusicObjectUrlRef = useRef<string | null>(null);
   const liveKitRoomRef = useRef<{ disconnect: () => void; startAudio?: () => Promise<void> } | null>(null);
   const liveKitAudioContainerRef = useRef<HTMLDivElement | null>(null);
   const isBingoTvModeRef = useRef(isBingoTvMode);
@@ -1460,6 +1484,92 @@ export default function HomePage() {
     playToneSequence([{ frequency: 740, start: 0, duration: 0.08, volume: 0.05 }]);
   }
 
+  function getBingoMusicAudio() {
+    if (typeof window === 'undefined') return null;
+
+    if (!bingoMusicAudioRef.current) {
+      const audio = new Audio(bingoMusicSrc);
+      audio.loop = true;
+      audio.preload = 'auto';
+      audio.setAttribute('playsinline', 'true');
+      bingoMusicAudioRef.current = audio;
+    }
+
+    if (bingoMusicAudioRef.current.src !== new URL(bingoMusicSrc, window.location.href).href) {
+      bingoMusicAudioRef.current.src = bingoMusicSrc;
+      bingoMusicAudioRef.current.load();
+    }
+
+    return bingoMusicAudioRef.current;
+  }
+
+  function setBingoMusicAudioVolume(duckForVoice = false) {
+    const audio = bingoMusicAudioRef.current;
+    if (!audio) return;
+
+    const baseVolume = Math.max(0, Math.min(1, soundVolumes.music ?? DEFAULT_SOUND_VOLUMES.music));
+    audio.volume = duckForVoice ? Math.min(baseVolume, 0.08) : baseVolume;
+  }
+
+  async function playBingoBackgroundMusic() {
+    try {
+      const audio = getBingoMusicAudio();
+      if (!audio) return;
+      setBingoMusicAudioVolume(false);
+      await audio.play();
+      setBingoMusicStatus('Background music playing');
+    } catch (error) {
+      console.warn('Background music skipped:', getErrorText(error));
+      setBingoMusicStatus('Music blocked or missing. Tap Play Music again, or add public/bingo-music.mp3.');
+    }
+  }
+
+  function pauseBingoBackgroundMusic(status = 'Music paused') {
+    const audio = bingoMusicAudioRef.current;
+    if (audio) {
+      audio.pause();
+    }
+    setBingoMusicStatus(status);
+  }
+
+  function toggleBingoBackgroundMusic() {
+    enableBingoSounds();
+
+    if (bingoMusicEnabled) {
+      setBingoMusicEnabled(false);
+      localStorage.setItem(BINGO_BACKGROUND_MUSIC_STORAGE_KEY, '0');
+      pauseBingoBackgroundMusic('Music off');
+      return;
+    }
+
+    setBingoMusicEnabled(true);
+    localStorage.setItem(BINGO_BACKGROUND_MUSIC_STORAGE_KEY, '1');
+
+    const musicRound = isBingoTvMode ? bingoTvRound : activeBingoRound;
+    if (musicRound?.roundId) {
+      void playBingoBackgroundMusic();
+    } else {
+      setBingoMusicStatus('Music ready. It will play when Bingo starts.');
+    }
+  }
+
+  function handleBingoMusicFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (bingoMusicObjectUrlRef.current) {
+      URL.revokeObjectURL(bingoMusicObjectUrlRef.current);
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    bingoMusicObjectUrlRef.current = objectUrl;
+    setBingoMusicSrc(objectUrl);
+    setBingoMusicEnabled(true);
+    localStorage.setItem(BINGO_BACKGROUND_MUSIC_STORAGE_KEY, '1');
+    setBingoMusicStatus(`Selected MP3: ${file.name}`);
+    window.setTimeout(() => void playBingoBackgroundMusic(), 100);
+  }
+
 
 
   function cleanJarvisVoiceText(value: string) {
@@ -1544,6 +1654,143 @@ export default function HomePage() {
     }
   }
 
+  function getBingoVoicePackSrc(value: string) {
+    const bingoCallMatch = value.match(/Bingo Call #?\d*\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
+    if (!bingoCallMatch) return '';
+
+    const letter = bingoCallMatch[1].toLowerCase();
+    const number = Number(bingoCallMatch[2]);
+    if (!Number.isFinite(number) || number < 1 || number > 75) return '';
+
+    return `${WEBOS_VOICE_PACK_BASE}/${letter}-${number}.mp3`;
+  }
+
+  function getSharedAudioElementForVoice() {
+    return getBingoMusicAudio();
+  }
+
+  async function waitForAudioEnd(audio: HTMLAudioElement, sequence: number) {
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        audio.onended = null;
+        audio.onerror = null;
+      };
+
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 22000);
+
+      audio.onended = () => {
+        window.clearTimeout(timeout);
+        cleanup();
+        resolve();
+      };
+
+      audio.onerror = () => {
+        window.clearTimeout(timeout);
+        cleanup();
+        reject(new Error('Audio playback failed or file is missing.'));
+      };
+    });
+
+    if (sequence !== voiceAudioSequenceRef.current) {
+      throw new Error('Voice playback was replaced by a newer call.');
+    }
+  }
+
+  async function playVoiceAudioUrl(audioSrc: string) {
+    const sequence = (voiceAudioSequenceRef.current += 1);
+    const audio = getSharedAudioElementForVoice();
+    if (!audio) return;
+
+    const musicRound = isBingoTvMode ? bingoTvRound : activeBingoRound;
+    const shouldResumeMusic = bingoMusicEnabled && Boolean(musicRound?.roundId);
+    const previousSrc = audio.src;
+    const previousCurrentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const previousLoop = audio.loop;
+    const previousWasPlaying = !audio.paused;
+
+    try {
+      audio.pause();
+      audio.loop = false;
+      audio.volume = Math.max(0.2, Math.min(1, soundVolumes.call || 0.8));
+      audio.src = audioSrc;
+      audio.load();
+      await audio.play();
+      setLiveKitVoiceStatus(webOsTtsMode || isLikelyWebOsTv() ? 'webOS TV voice playing' : 'Cloud voice playing');
+      await waitForAudioEnd(audio, sequence);
+    } finally {
+      if (sequence === voiceAudioSequenceRef.current) {
+        audio.pause();
+        audio.loop = previousLoop;
+        audio.src = previousSrc || bingoMusicSrc;
+        audio.load();
+
+        try {
+          if (previousSrc) audio.currentTime = previousCurrentTime;
+        } catch {
+          // Some TV browsers do not allow restoring currentTime until metadata is ready.
+        }
+
+        setBingoMusicAudioVolume(false);
+        if (shouldResumeMusic || previousWasPlaying) {
+          void audio.play().catch((error) => {
+            console.warn('Could not resume music after voice:', getErrorText(error));
+          });
+        }
+      }
+    }
+  }
+
+  async function tryPlayBingoVoicePack(value: string) {
+    const voicePackSrc = getBingoVoicePackSrc(value);
+    if (!voicePackSrc) return false;
+
+    try {
+      const response = await fetch(voicePackSrc, { method: 'HEAD', cache: 'force-cache' });
+      if (!response.ok) return false;
+      await playVoiceAudioUrl(voicePackSrc);
+      setLiveKitVoiceStatus('MP3 voice pack active');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function playCloudTtsVoice(voiceText: string, originalText: string) {
+    if (await tryPlayBingoVoicePack(originalText)) return true;
+
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: voiceText })
+    });
+
+    if (!response.ok) {
+      let details = `TTS route failed with status ${response.status}`;
+      try {
+        const data = (await response.json()) as { error?: string; details?: string };
+        details = [data.error, data.details].filter(Boolean).join(' | ') || details;
+      } catch {
+        // Keep the generic details.
+      }
+      throw new Error(details);
+    }
+
+    const audioBlob = await response.blob();
+    if (!audioBlob.size) throw new Error('TTS route returned empty audio.');
+
+    const objectUrl = URL.createObjectURL(audioBlob);
+    try {
+      await playVoiceAudioUrl(objectUrl);
+      setLiveKitVoiceStatus('Cloud TTS voice active');
+      return true;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
   function getJarvisMaleEnglishVoice() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
 
@@ -1592,16 +1839,41 @@ export default function HomePage() {
   function speakJarvisText(text: string, force = false) {
     if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
 
-    // v15.7: use the reliable local browser voice for English Bingo called numbers.
-    // LiveKit agent is optional and no longer blocks Jarvis from reading the calls.
+    const voiceText = buildJarvisSpeechText(text);
+    if (!voiceText) return;
 
-    if (!('speechSynthesis' in window)) {
-      setLiveKitVoiceStatus('Voice not supported by this browser');
+    const useTvSafeTts = webOsTtsMode || isLikelyWebOsTv();
+
+    if (useTvSafeTts) {
+      setBingoMusicAudioVolume(true);
+      void playCloudTtsVoice(voiceText, text).catch((error) => {
+        console.warn('webOS/cloud TTS skipped:', getErrorText(error));
+        setBingoMusicAudioVolume(false);
+        setLiveKitVoiceStatus(`TV voice needs MP3 pack or ElevenLabs env: ${getErrorText(error)}`);
+
+        if ('speechSynthesis' in window) {
+          try {
+            const utterance = new SpeechSynthesisUtterance(voiceText);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.88;
+            utterance.pitch = 0.74;
+            utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
+            utterance.onend = () => setBingoMusicAudioVolume(false);
+            utterance.onerror = () => setBingoMusicAudioVolume(false);
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+          } catch (speechError) {
+            console.warn('Browser voice fallback failed:', getErrorText(speechError));
+          }
+        }
+      });
       return;
     }
 
-    const voiceText = buildJarvisSpeechText(text);
-    if (!voiceText) return;
+    if (!('speechSynthesis' in window)) {
+      setLiveKitVoiceStatus('Voice not supported. Enable TV TTS mode or add MP3 voice pack.');
+      return;
+    }
 
     try {
       const selectedVoice = getJarvisMaleEnglishVoice();
@@ -1618,6 +1890,9 @@ export default function HomePage() {
       utterance.rate = 0.9;
       utterance.pitch = 0.72;
       utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
+      utterance.onstart = () => setBingoMusicAudioVolume(true);
+      utterance.onend = () => setBingoMusicAudioVolume(false);
+      utterance.onerror = () => setBingoMusicAudioVolume(false);
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
     } catch (error) {
@@ -1676,12 +1951,20 @@ export default function HomePage() {
       // Some browsers load voices only after this call/user interaction.
       window.speechSynthesis.getVoices();
     }
+
+    const shouldUseTvSafeVoice = webOsTtsMode || isLikelyWebOsTv();
+    if (shouldUseTvSafeVoice) {
+      setWebOsTtsMode(true);
+      localStorage.setItem(WEBOS_TTS_STORAGE_KEY, '1');
+      getSharedAudioElementForVoice();
+    }
+
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus('Browser voice active. Jarvis will read the called numbers.');
+    setLiveKitVoiceStatus(shouldUseTvSafeVoice ? 'webOS TV voice mode ready' : 'Browser voice active. Jarvis will read the called numbers.');
     speakJarvisText('Jarvis Voice is on. I will read the called numbers in English.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
@@ -1691,6 +1974,7 @@ export default function HomePage() {
   }
 
   function disableJarvisVoice() {
+    voiceAudioSequenceRef.current += 1;
     setJarvisVoiceEnabled(false);
     setLiveKitVoiceStatus('Voice off');
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -1750,6 +2034,9 @@ export default function HomePage() {
     setSoundVolumes((current) => {
       const updated = { ...current, [key]: next };
       localStorage.setItem('bingo_sound_volumes', JSON.stringify(updated));
+      if (key === 'music') {
+        window.setTimeout(() => setBingoMusicAudioVolume(false), 0);
+      }
       return updated;
     });
   }
@@ -2654,6 +2941,14 @@ export default function HomePage() {
     } catch {
       setSoundVolumes({ ...DEFAULT_SOUND_VOLUMES });
     }
+
+    setBingoMusicEnabled(localStorage.getItem(BINGO_BACKGROUND_MUSIC_STORAGE_KEY) === '1');
+    const savedWebOsMode = localStorage.getItem(WEBOS_TTS_STORAGE_KEY) === '1';
+    const detectedWebOs = isLikelyWebOsTv();
+    setWebOsTtsMode(savedWebOsMode || detectedWebOs);
+    if (savedWebOsMode || detectedWebOs) {
+      setLiveKitVoiceStatus('webOS TV detected. Tap Jarvis Voice to unlock TV-safe audio.');
+    }
   }, []);
 
 
@@ -2663,6 +2958,8 @@ export default function HomePage() {
         window.speechSynthesis.cancel();
       }
       liveKitRoomRef.current?.disconnect();
+      bingoMusicAudioRef.current?.pause();
+      if (bingoMusicObjectUrlRef.current) URL.revokeObjectURL(bingoMusicObjectUrlRef.current);
     };
   }, []);
 
@@ -2684,6 +2981,26 @@ export default function HomePage() {
     lastJarvisSpokenMessageIdRef.current = latestMessage.id;
     speakJarvisText(latestMessage.content);
   }, [messages, jarvisVoiceEnabled]);
+
+  useEffect(() => {
+    setBingoMusicAudioVolume(false);
+  }, [soundVolumes.music]);
+
+  useEffect(() => {
+    const musicRound = isBingoTvMode ? bingoTvRound : activeBingoRound;
+
+    if (!bingoMusicEnabled) {
+      pauseBingoBackgroundMusic('Music off');
+      return;
+    }
+
+    if (musicRound?.roundId) {
+      void playBingoBackgroundMusic();
+      return;
+    }
+
+    pauseBingoBackgroundMusic('Music ready. It will play when Bingo starts.');
+  }, [bingoMusicEnabled, activeBingoRound?.roundId, bingoTvRound?.roundId, isBingoTvMode, bingoMusicSrc]);
 
   useEffect(() => {
     const tvMode = isBingoTvUrl();
@@ -3489,8 +3806,11 @@ export default function HomePage() {
             <button type="button" onClick={jarvisVoiceEnabled ? disableJarvisVoice : enableJarvisVoice}>
               {jarvisVoiceEnabled ? <VolumeX size={18} /> : <Volume2 size={18} />} {jarvisVoiceEnabled ? 'Jarvis Voice On' : 'Jarvis Voice'}
             </button>
+            <button type="button" onClick={toggleBingoBackgroundMusic}>
+              <Music size={18} /> {bingoMusicEnabled ? 'Music On' : 'Play Music'}
+            </button>
             <button type="button" onClick={enterBingoTvFullscreen}>Fullscreen</button>
-            <span className="jarvis-voice-status">{liveKitVoiceStatus}</span>
+            <span className="jarvis-voice-status">{webOsTtsMode ? 'webOS TV audio mode · ' : ''}{liveKitVoiceStatus} · {bingoMusicStatus}</span>
           </div>
         </section>
       </main>
@@ -3804,6 +4124,16 @@ export default function HomePage() {
                       <input type="range" min="0" max="1" step="0.05" value={soundVolumes[key]} onChange={(event) => changeSoundVolume(key, event.target.value)} />
                     </label>
                   ))}
+                  <div className="background-music-tools">
+                    <button type="button" onClick={toggleBingoBackgroundMusic}>
+                      <Music size={13} /> {bingoMusicEnabled ? 'Stop MP3 Music' : 'Play MP3 Music'}
+                    </button>
+                    <label className="music-upload-button">
+                      Choose MP3
+                      <input type="file" accept="audio/mpeg,audio/mp3,audio/*" onChange={handleBingoMusicFileChange} />
+                    </label>
+                    <small>{bingoMusicStatus}</small>
+                  </div>
                 </div>
               </section>
             ) : null}
@@ -4160,6 +4490,9 @@ export default function HomePage() {
             ) : null}
             <button type="button" className="jarvis-voice-button" onClick={jarvisVoiceEnabled ? disableJarvisVoice : enableJarvisVoice} title={liveKitVoiceStatus}>
               {jarvisVoiceEnabled ? <VolumeX size={17} /> : <Volume2 size={17} />} {jarvisVoiceEnabled ? 'Voice On' : 'Jarvis Voice'}
+            </button>
+            <button type="button" className="jarvis-voice-button bingo-music-button" onClick={toggleBingoBackgroundMusic} title={bingoMusicStatus}>
+              <Music size={17} /> {bingoMusicEnabled ? 'Music On' : 'Bingo Music'}
             </button>
             <div className="sender-pill">Logged in as: <strong>{senderName || 'Name required'}</strong>{isAdminUser ? <span className="admin-verified-badge">Admin verified</span> : null}</div>
             {myName ? (

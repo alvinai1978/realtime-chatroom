@@ -4566,3 +4566,50 @@ button {
   opacity: 0;
   pointer-events: none;
 }
+
+/* v15.8 Bingo MP3 background music controls */
+.bingo-music-button {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
+
+.bingo-music-button:hover {
+  background: #ffedd5;
+}
+
+.background-music-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(199, 210, 254, 0.65);
+}
+
+.background-music-tools button,
+.music-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.music-upload-button input {
+  display: none;
+}
+
+.background-music-tools small {
+  grid-column: 1 / -1;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+}

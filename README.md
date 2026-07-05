@@ -1,6 +1,78 @@
-# Realtime Chatroom Jarvis v15.7
+# Realtime Chatroom Jarvis v15.9
 
-Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, at Jarvis-hosted Bingo.
+Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, Jarvis-hosted Bingo, MP3 music, and webOS TV-safe voice playback.
+
+## New in v15.9 - webOS TV TTS Compatibility
+
+- Added webOS TV detection for LG TV browsers / WebAppManager / Smart TV user agents.
+- Added **webOS TV audio mode** so Jarvis can read Bingo calls without depending only on `window.speechSynthesis`.
+- Added `app/api/tts/route.ts`, a server-side TTS bridge that returns MP3 audio for TV playback.
+- The TTS bridge uses ElevenLabs when these Vercel env vars are configured:
+  - `ELEVENLABS_API_KEY`
+  - `ELEVENLABS_VOICE_ID`
+  - optional: `ELEVENLABS_MODEL_ID=eleven_multilingual_v2`
+- Added optional static MP3 voice-pack support at:
+  - `public/voices/bingo-en/b-1.mp3` through `public/voices/bingo-en/o-75.mp3`
+- On webOS mode, the app uses one shared audio element for voice/music to avoid LG TV audio conflicts.
+- When Jarvis speaks a called number, background music pauses/ducks, then resumes after the voice.
+- If ElevenLabs env vars are missing and no MP3 voice pack exists, the app shows a clear status message instead of silently failing.
+
+### v15.9 Vercel env for cloud TTS
+
+```powershell
+vercel env add ELEVENLABS_API_KEY production
+vercel env add ELEVENLABS_VOICE_ID production
+vercel env add ELEVENLABS_MODEL_ID production
+```
+
+Recommended model value:
+
+```env
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+```
+
+Then redeploy:
+
+```powershell
+vercel --prod
+```
+
+### Optional MP3 voice pack naming
+
+```text
+public/voices/bingo-en/b-1.mp3 ... b-15.mp3
+public/voices/bingo-en/i-16.mp3 ... i-30.mp3
+public/voices/bingo-en/n-31.mp3 ... n-45.mp3
+public/voices/bingo-en/g-46.mp3 ... g-60.mp3
+public/voices/bingo-en/o-61.mp3 ... o-75.mp3
+```
+
+## New in v15.8
+
+- Added optional MP3 background music while Bingo is running.
+- New **Bingo Music / Play Music** button in the chat topbar and BingoTV.
+- Ripple admin gets a **Choose MP3** button inside the Sound Control Panel for quick local testing.
+- Default deployed music file path is `public/bingo-music.mp3`. Add your own MP3 there, then deploy.
+- Added separate `music` volume slider. Default background music volume is low so Jarvis called numbers remain clear.
+- Music automatically ducks lower while Jarvis reads a called number, then returns to the selected music volume.
+- Music pauses when no Bingo round is active and resumes when the next round starts if Music is enabled.
+
+### How to add your MP3 permanently
+
+Put your MP3 here:
+
+```text
+D:\realtime-chatroom\public\bingo-music.mp3
+```
+
+Then deploy:
+
+```powershell
+git add public/bingo-music.mp3 app/page.tsx app/globals.css README.md
+git commit -m "Add Bingo background music"
+git push
+vercel --prod
+```
 
 ## New in v15.7
 
@@ -86,8 +158,8 @@ http://localhost:3000
 ## Deploy
 
 ```bash
-git add app/page.tsx app/globals.css app/api/livekit-token/route.ts package.json README.md
-git commit -m "Add player multi card Bingo options"
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public/voices/bingo-en/PUT_CALL_MP3_HERE.txt
+git commit -m "Add webOS TV-safe Jarvis TTS"
 git push
 vercel --prod
 ```
