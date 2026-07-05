@@ -1,9 +1,13 @@
-# RIPPLE Jarvis Realtime Chatroom - v15.25 LiveKit Tagalog Voice Restore
+# RIPPLE Jarvis Realtime Chatroom - v15.26 LiveKit Ready Buffer Fix
 
 This package switches Jarvis voice back to **LiveKit Agent mode**.
 
-## What changed in v15.25
+## What changed in v15.26
 
+- **Ready buffer fix:** kapag may Bingo message pero `AgentSession is not running` pa, hindi na itatapon ni Jarvis ang message; ire-retry muna niya hanggang ready ang LiveKit session.
+- **Single watcher guard:** kapag may duplicate LiveKit job request, ia-abort ang old poller para hindi doble-doble ang Supabase watcher.
+- **LiveKit timeout retry:** retryable `APITimeoutError` is retried before skipping.
+- **Light mode:** shorter max speech text and smaller polling batch para bumaba ang memory pressure.
 - Jarvis Voice now connects to the **LiveKit room** instead of using Azure, ElevenLabs, Microsoft browser TTS, or normal browser TTS.
 - The included `jarvis-voice-agent/` uses **LiveKit Inference + Cartesia Sonic 3.5**.
 - Default language is set to `tl` for Tagalog.
@@ -39,7 +43,7 @@ npm install
 npm run build
 
 git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public scripts jarvis-voice-agent
-git commit -m "Restore LiveKit Tagalog Jarvis voice agent"
+git commit -m "Add LiveKit Jarvis ready buffer fix"
 git push
 vercel --prod
 ```
@@ -91,6 +95,11 @@ JARVIS_TTS_VOICE_ID=9626c31c-bec5-4cca-baa8-f8ba9e84c8bc
 JARVIS_TTS_SPEED=0.95
 JARVIS_TTS_VOLUME=1.15
 JARVIS_TTS_EMOTION=excited
+
+JARVIS_MAX_TEXT_CHARS=360
+JARVIS_SAY_RETRY_COUNT=10
+JARVIS_SAY_RETRY_MS=900
+JARVIS_AFTER_SPEAK_PAUSE_MS=350
 ```
 
 Then run:
@@ -105,7 +114,7 @@ Keep that PowerShell window open while Bingo is running.
 
 1. Open the deployed chatroom or BingoTV.
 2. Click **Jarvis Voice**.
-3. Make sure the PowerShell window says the agent is registered and connected.
+3. Make sure the PowerShell window says the agent is registered, connected, and shows `LiveKit Inference TTS options`.
 4. Start Bingo.
 5. Jarvis should speak through LiveKit, in Tagalog/Taglish style.
 
@@ -133,3 +142,22 @@ npm run connect
   - `jarvis-voice-agent` is running.
   - The `.env` file has Supabase URL/key so the agent can read messages.
   - You clicked **Jarvis Voice** in the app or BingoTV.
+
+
+## v15.26 troubleshooting
+
+If you see:
+
+```text
+Polling skipped: AgentSession is not running
+```
+
+v15.26 will keep the speech message in queue and retry instead of losing it. Still use a clean restart when changing env values:
+
+```powershell
+Get-Process node | Stop-Process -Force
+cd D:\realtime-chatroom\jarvis-voice-agent
+npm run connect
+```
+
+Wait for `Connect callback received` and `LiveKit Inference TTS options`, then open BingoTV/chatroom and click **Jarvis Voice**.
