@@ -171,3 +171,14 @@ npm run connect
 ```
 
 Wait for `Connect callback received` and `LiveKit Inference TTS options`, then open BingoTV/chatroom and click **Jarvis Voice**.
+
+
+## v15.28 LiveKit Audible Audio Attach Fix
+
+- Fixed missing LiveKit audio container in the app/BingoTV DOM.
+- Forces subscription to remote LiveKit audio tracks.
+- Attaches existing and newly published Jarvis audio tracks.
+- Unlocks LiveKit audio from the Jarvis Voice button click.
+- Adds clearer status messages when audio is attached or blocked.
+
+If logs show `Speaking LiveKit Tagalog` but no sound is heard, click **Jarvis Voice** again after the agent is connected.

@@ -1777,24 +1777,103 @@ export default function HomePage() {
       .slice(0, 280);
   }
 
-  function attachLiveKitAudioTrack(track: { kind?: string; attach?: () => HTMLElement }) {
-    if (track.kind !== 'audio' || !track.attach || !liveKitAudioContainerRef.current) return;
+  function getLiveKitTrackId(track: any) {
+    return String(track?.sid || track?.mediaStreamTrack?.id || track?.trackSid || `audio-${Date.now()}`);
+  }
+
+  async function unlockAttachedLiveKitAudio() {
+    try {
+      const audioContext = getAudioContext();
+      if (audioContext?.state === 'suspended') await audioContext.resume();
+    } catch {
+      // Browser may not allow AudioContext until the next user tap.
+    }
 
     try {
-      const element = track.attach();
-      element.setAttribute('data-jarvis-livekit-audio', '1');
-      element.setAttribute('playsinline', 'true');
-      (element as HTMLMediaElement).autoplay = true;
-      liveKitAudioContainerRef.current.appendChild(element);
+      await liveKitRoomRef.current?.startAudio?.();
+    } catch {
+      // Keep going. Attached audio elements may still play.
+    }
 
-      const maybeAudio = element as HTMLAudioElement;
-      if (typeof maybeAudio.play === 'function') {
-        void maybeAudio.play().catch(() => {
-          setLiveKitVoiceStatus('Tap Jarvis Voice again to allow LiveKit audio');
-        });
+    const audioElements = Array.from(
+      liveKitAudioContainerRef.current?.querySelectorAll<HTMLAudioElement>('[data-jarvis-livekit-audio]') || []
+    );
+
+    for (const audio of audioElements) {
+      try {
+        audio.muted = false;
+        audio.autoplay = true;
+        audio.volume = Math.max(0.75, Math.min(1, soundVolumes.call || 1));
+        await audio.play();
+      } catch {
+        setLiveKitVoiceStatus('Tap Jarvis Voice again to unlock LiveKit audio');
       }
+    }
+  }
+
+  function attachLiveKitAudioTrack(track: any, participantName = 'Jarvis') {
+    const kind = String(track?.kind || '').toLowerCase();
+    if (kind !== 'audio' || typeof track?.attach !== 'function') return;
+
+    const trackId = getLiveKitTrackId(track);
+    const container = liveKitAudioContainerRef.current;
+    if (!container) {
+      setLiveKitVoiceStatus('LiveKit audio container missing. Refresh the app.');
+      return;
+    }
+
+    if (container.querySelector(`[data-livekit-track-id="${trackId}"]`)) {
+      void unlockAttachedLiveKitAudio();
+      return;
+    }
+
+    try {
+      const element = track.attach() as HTMLAudioElement;
+      element.setAttribute('data-jarvis-livekit-audio', '1');
+      element.setAttribute('data-livekit-track-id', trackId);
+      element.setAttribute('playsinline', 'true');
+      element.autoplay = true;
+      element.muted = false;
+      element.volume = Math.max(0.75, Math.min(1, soundVolumes.call || 1));
+      element.style.width = '1px';
+      element.style.height = '1px';
+      element.style.opacity = '0.01';
+      element.style.position = 'fixed';
+      element.style.left = '-10px';
+      element.style.bottom = '-10px';
+      container.appendChild(element);
+      setLiveKitVoiceStatus(`LiveKit audio attached from ${participantName}`);
+      void unlockAttachedLiveKitAudio();
     } catch (error) {
       console.warn('Could not attach LiveKit audio:', getErrorText(error));
+      setLiveKitVoiceStatus(`Could not attach LiveKit audio: ${getErrorText(error)}`);
+    }
+  }
+
+  function attachLiveKitPublication(publication: any, participantName = 'Jarvis') {
+    if (!publication) return;
+    const kind = String(publication.kind || publication.track?.kind || '').toLowerCase();
+    if (kind && kind !== 'audio') return;
+
+    try {
+      if (typeof publication.setSubscribed === 'function') publication.setSubscribed(true);
+    } catch {
+      // Continue; publication.track may already be subscribed.
+    }
+
+    if (publication.track) attachLiveKitAudioTrack(publication.track, participantName);
+  }
+
+  function attachAllLiveKitRemoteAudio(room: any) {
+    try {
+      room?.remoteParticipants?.forEach?.((participant: any) => {
+        const name = participant?.identity || participant?.name || 'Jarvis';
+        participant?.trackPublications?.forEach?.((publication: any) => attachLiveKitPublication(publication, name));
+        participant?.audioTrackPublications?.forEach?.((publication: any) => attachLiveKitPublication(publication, name));
+      });
+      void unlockAttachedLiveKitAudio();
+    } catch (error) {
+      console.warn('Could not scan LiveKit remote audio:', getErrorText(error));
     }
   }
 
@@ -2120,23 +2199,38 @@ export default function HomePage() {
       liveKitRoomRef.current?.disconnect();
       liveKitAudioContainerRef.current?.querySelectorAll('[data-jarvis-livekit-audio]').forEach((element) => element.remove());
 
-      const room = new Room({ adaptiveStream: true, dynacast: true });
-      room.on(RoomEvent.Connected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Tagalog Jarvis agent'));
+      const room = new Room({ adaptiveStream: false, dynacast: false });
+      room.on(RoomEvent.Connected, () => {
+        setLiveKitVoiceStatus('LiveKit connected. Waiting for Tagalog Jarvis agent');
+        setTimeout(() => attachAllLiveKitRemoteAudio(room), 300);
+      });
       room.on(RoomEvent.Disconnected, () => setLiveKitVoiceStatus('LiveKit voice disconnected'));
       room.on(RoomEvent.Reconnecting, () => setLiveKitVoiceStatus('LiveKit reconnecting...'));
-      room.on(RoomEvent.Reconnected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Tagalog Jarvis agent'));
-      room.on(RoomEvent.TrackSubscribed, (track) => {
-        attachLiveKitAudioTrack(track as { kind?: string; attach?: () => HTMLElement });
-        if ((track as { kind?: string }).kind === 'audio') setLiveKitVoiceStatus('LiveKit Tagalog Agent voice active');
+      room.on(RoomEvent.Reconnected, () => {
+        setLiveKitVoiceStatus('LiveKit reconnected. Checking Jarvis audio');
+        setTimeout(() => attachAllLiveKitRemoteAudio(room), 300);
+      });
+      room.on(RoomEvent.ParticipantConnected, (participant: any) => {
+        setLiveKitVoiceStatus(`LiveKit participant joined: ${participant?.identity || 'Jarvis'}`);
+        setTimeout(() => attachAllLiveKitRemoteAudio(room), 400);
+      });
+      room.on(RoomEvent.TrackPublished, (publication: any, participant: any) => {
+        attachLiveKitPublication(publication, participant?.identity || 'Jarvis');
+      });
+      room.on(RoomEvent.TrackSubscribed, (track: any, _publication: any, participant: any) => {
+        attachLiveKitAudioTrack(track, participant?.identity || 'Jarvis');
+        if (String(track?.kind || '').toLowerCase() === 'audio') setLiveKitVoiceStatus('LiveKit Tagalog Agent audio attached');
       });
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
         detachLiveKitAudioTrack(track as { detach?: () => HTMLElement[] });
       });
 
-      await room.connect(data.url, data.token);
+      await room.connect(data.url, data.token, { autoSubscribe: true });
       liveKitRoomRef.current = room;
-      await room.startAudio?.();
-      setLiveKitVoiceStatus('LiveKit connected. Run jarvis-voice-agent if no voice is heard');
+      await unlockAttachedLiveKitAudio();
+      attachAllLiveKitRemoteAudio(room);
+      setTimeout(() => attachAllLiveKitRemoteAudio(room), 1200);
+      setLiveKitVoiceStatus('LiveKit connected. Audio unlocked; waiting for Jarvis speech');
     } catch (error) {
       setLiveKitVoiceStatus(`LiveKit unavailable. Run jarvis-voice-agent and check LiveKit env. ${getErrorText(error)}`);
     }
@@ -2149,6 +2243,7 @@ export default function HomePage() {
     setWebOsTtsMode(false);
     localStorage.removeItem(WEBOS_TTS_STORAGE_KEY);
     getJarvisVoiceAudioElement();
+    void unlockAttachedLiveKitAudio();
 
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
@@ -3826,6 +3921,7 @@ export default function HomePage() {
 
     return (
       <main className="bingo-tv-shell bingo-tv-fixed-shell">
+        <div ref={liveKitAudioContainerRef} className="livekit-audio-dock" aria-hidden="true" />
         <div className="bingo-tv-title-card">
           <p>Jarvis hosted monitor</p>
           <h1>BingoTV</h1>
@@ -4025,6 +4121,7 @@ export default function HomePage() {
 
   return (
     <main className="messenger-shell">
+      <div ref={liveKitAudioContainerRef} className="livekit-audio-dock" aria-hidden="true" />
       {confettiPieces.length > 0 ? (
         <div className="confetti-layer" aria-live="polite" aria-label="Top score celebration">
           {confettiPieces.map((piece) => (

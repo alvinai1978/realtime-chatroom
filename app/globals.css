@@ -4613,3 +4613,20 @@ button {
   font-size: 0.72rem;
   font-weight: 800;
 }
+
+.livekit-audio-dock {
+  position: fixed;
+  left: -20px;
+  bottom: -20px;
+  width: 2px;
+  height: 2px;
+  overflow: hidden;
+  opacity: 0.01;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.livekit-audio-dock audio {
+  width: 1px;
+  height: 1px;
+}
