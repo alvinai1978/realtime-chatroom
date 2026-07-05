@@ -922,6 +922,77 @@ function numberToEnglishSpeech(number: number) {
   return `${tensText} ${belowTwenty[onesPart]}`;
 }
 
+function numberToTagalogSpeech(number: number) {
+  const ones: Record<number, string> = {
+    0: 'zero',
+    1: 'isa',
+    2: 'dalawa',
+    3: 'tatlo',
+    4: 'apat',
+    5: 'lima',
+    6: 'anim',
+    7: 'pito',
+    8: 'walo',
+    9: 'siyam',
+    10: 'sampu',
+    11: 'labing isa',
+    12: 'labing dalawa',
+    13: 'labing tatlo',
+    14: 'labing apat',
+    15: 'labing lima',
+    16: 'labing anim',
+    17: 'labing pito',
+    18: 'labing walo',
+    19: 'labing siyam'
+  };
+
+  if (number <= 19) return ones[number] || String(number);
+
+  const tensText: Record<number, string> = {
+    20: 'dalawampu',
+    30: 'tatlumpu',
+    40: 'apatnapu',
+    50: 'limampu',
+    60: 'animnapu',
+    70: 'pitumpu'
+  };
+
+  const tensPart = Math.floor(number / 10) * 10;
+  const onesPart = number % 10;
+  if (!onesPart) return tensText[tensPart] || String(number);
+  return `${tensText[tensPart] || tensPart} at ${ones[onesPart]}`;
+}
+
+function numberToTagalogBingoVoiceLabel(number: number) {
+  const label = numberToBingoLabel(number);
+  const letter = label.charAt(0).toUpperCase();
+  const letterSpeech: Record<string, string> = { B: 'B', I: 'I', N: 'N', G: 'G', O: 'O' };
+  return `${letterSpeech[letter] || letter}, ${numberToTagalogSpeech(number)}`;
+}
+
+function getPinoyBingoJoke(callNumber: number, calledNumber: number) {
+  const jokes = [
+    'Relax lang mga ka-Bingo, hindi ito exam, pero bawal mangopya ng card ng katabi.',
+    'Kung wala sa card ninyo, ngumiti lang. Baka nasa puso ninyo ang panalo.',
+    'Ang unang mag-Bingo, libre ang kaba. Ang hindi pa, kapit lang sa dauber.',
+    'Markahan nang maayos, huwag parang attendance sa barangay meeting.',
+    'Kapag malapit na kayo, huminga muna. Baka false alarm na naman iyan.',
+    'Sa Bingo, bawal ang marupok. Official called numbers lang ang susundin.',
+    'Kung hindi lumabas ang numero mo, huwag tampo. May next draw pa, parang next episode ng teleserye.',
+    'Check muna bago sumigaw ng Bingo. Baka B na B lang ang confidence.',
+    'Mga ka-Bingo, steady lang. Hindi porke may apat ka na, winner ka na agad.',
+    'Kapag nanalo ka, smile muna bago celebration. Para ready sa winner report.',
+    'Kung kinakabahan ka, normal iyan. Bingo iyan, hindi lang laro, cardio rin.',
+    'Paki-check ang cards. Baka nasa ilalim ng chichirya ang hinahanap mong number.'
+  ];
+  return jokes[(callNumber + calledNumber) % jokes.length];
+}
+
+function estimateJarvisSpeechMs(text: string) {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.min(26000, Math.max(9000, words * 430 + 2500));
+}
+
 function numberToBingoVoiceLabel(number: number) {
   const label = numberToBingoLabel(number);
   const letter = label.charAt(0).toUpperCase();
@@ -1211,6 +1282,8 @@ export default function HomePage() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastBingoCallSoundRef = useRef('');
   const lastJarvisSpokenMessageIdRef = useRef<number | null>(null);
+  const jarvisVoiceBusyUntilRef = useRef(0);
+  const lastBingoCallSpeechDoneKeyRef = useRef('');
   const bingoMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioSequenceRef = useRef(0);
   const bingoMusicObjectUrlRef = useRef<string | null>(null);
@@ -1583,11 +1656,11 @@ export default function HomePage() {
   function buildJarvisSpeechText(value: string) {
     const bingoCallMatch = value.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
     if (bingoCallMatch) {
-      const callCount = bingoCallMatch[1] ? Number(bingoCallMatch[1]) : null;
+      const callCount = bingoCallMatch[1] ? Number(bingoCallMatch[1]) : 1;
       const number = Number(bingoCallMatch[3]);
-      const voiceLabel = numberToBingoVoiceLabel(number);
-      const callPrefix = callCount ? `Call number ${numberToEnglishSpeech(callCount)}. ` : '';
-      return `${callPrefix}${voiceLabel}. I repeat, ${voiceLabel}. Mark it if it is on your card.`;
+      const voiceLabel = numberToTagalogBingoVoiceLabel(number);
+      const joke = getPinoyBingoJoke(callCount, number);
+      return `Tawag bilang ${numberToTagalogSpeech(callCount)}. ${voiceLabel}. Ulitin ko, ${voiceLabel}. Markahan kung nasa card ninyo. ${joke}`;
     }
 
     const compact = cleanJarvisVoiceText(value);
@@ -1595,34 +1668,34 @@ export default function HomePage() {
 
     if (/Bingo starts in/i.test(compact)) {
       const seconds = Number(compact.match(/Bingo starts in\s*(\d+)/i)?.[1] || BINGO_COUNTDOWN_SECONDS);
-      return `Bingo starts in ${numberToEnglishSpeech(seconds)} seconds. Please get your cards ready.`;
+      return `Magsisimula ang Bingo sa loob ng ${numberToTagalogSpeech(seconds)} segundo. Ihanda na ang inyong mga card.`;
     }
 
     if (/Jarvis Bingo started/i.test(compact)) {
-      return 'Bingo has started. Listen to every called number and mark only the official calls.';
+      return 'Nagsimula na ang Bingo. Makinig sa bawat tawag na numero at markahan lamang ang official called numbers.';
     }
 
     if (/reset the called numbers/i.test(compact)) {
-      return 'The called numbers have been reset. Jarvis will start again from the first call.';
+      return 'Ni-reset ang mga tinawag na numero. Magsisimula ulit si Jarvis sa unang tawag.';
     }
 
     if (/All 75 numbers were called/i.test(compact)) {
-      return 'The Bingo round is over. All seventy five numbers have been called.';
+      return 'Tapos na ang Bingo round. Natawag na ang lahat ng pitumpu at limang numero.';
     }
 
     if (/BINGO verified/i.test(compact)) {
       const winner = compact.match(/Winner #\d+:\s*([^ ]+)/i)?.[1] || 'player';
-      return `Bingo verified. ${winner} wins. Congratulations.`;
+      return `Verified ang Bingo. Panalo si ${winner}. Congratulations. Palakpakan naman diyan.`;
     }
 
     if (/not valid|invalid|Hindi pa valid/i.test(compact)) {
-      return 'The Bingo claim is not valid yet. It is missing official called numbers.';
+      return 'Hindi pa valid ang Bingo claim. May kulang pang official called numbers. Huwag mag-alala, may pag-asa pa.';
     }
 
     return compact
-      .replace(/Bingo Call #(\d+):/gi, 'Call number $1:')
-      .replace(/called numbers/gi, 'called numbers')
-      .slice(0, 260);
+      .replace(/Bingo Call #(\d+):/gi, 'Tawag bilang $1:')
+      .replace(/called numbers/gi, 'tinawag na mga numero')
+      .slice(0, 280);
   }
 
   function attachLiveKitAudioTrack(track: { kind?: string; attach?: () => HTMLElement }) {
@@ -1848,12 +1921,23 @@ export default function HomePage() {
 
     if (useCloudTts) {
       setBingoMusicAudioVolume(true);
-      void playCloudTtsVoice(voiceText, text).catch((error) => {
-        const details = getErrorText(error);
-        console.warn('ElevenLabs/cloud TTS failed:', details);
-        setBingoMusicAudioVolume(false);
-        setLiveKitVoiceStatus(`ElevenLabs not active: ${details}`);
-      });
+      const busyMs = estimateJarvisSpeechMs(voiceText);
+      jarvisVoiceBusyUntilRef.current = Math.max(jarvisVoiceBusyUntilRef.current, Date.now() + busyMs);
+      void playCloudTtsVoice(voiceText, text)
+        .then(() => {
+          jarvisVoiceBusyUntilRef.current = Date.now() + 700;
+          const bingoCallMatch = text.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
+          if (bingoCallMatch) {
+            lastBingoCallSpeechDoneKeyRef.current = `${bingoCallMatch[1] || '1'}-${bingoCallMatch[2].toUpperCase()}-${bingoCallMatch[3]}`;
+          }
+        })
+        .catch((error) => {
+          const details = getErrorText(error);
+          console.warn('ElevenLabs/cloud TTS failed:', details);
+          setBingoMusicAudioVolume(false);
+          setLiveKitVoiceStatus(`ElevenLabs not active: ${details}`);
+          jarvisVoiceBusyUntilRef.current = Date.now() + busyMs;
+        });
       return;
     }
 
@@ -1951,7 +2035,7 @@ export default function HomePage() {
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
     setLiveKitVoiceStatus('ElevenLabs cloud voice mode ready. If it fails, normal browser TTS will not play.');
-    speakJarvisText('Jarvis Voice is on. I will read the called numbers in English.', true);
+    speakJarvisText('Naka-on na ang boses ni Jarvis. Babasahin ko ang Bingo sa Tagalog, may konting Pinoy Bingo joke kada tawag.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
     if (latestBingoCall) {
@@ -2571,8 +2655,22 @@ export default function HomePage() {
 
     if (latestCallMessage) {
       const elapsedMs = Date.now() - new Date(latestCallMessage.created_at).getTime();
-      const requiredDelayMs = Math.max(1000, (round.callIntervalMs || BINGO_CALL_INTERVAL_MS) - 250);
-      if (elapsedMs < requiredDelayMs) return;
+      const latestCallNumber = parseBingoCallNumber(latestCallMessage.content);
+      const latestCallCountMatch = latestCallMessage.content.match(/Bingo Call #?(\d+)/i);
+      const latestCallCount = latestCallCountMatch ? latestCallCountMatch[1] : String(calledNumbers.length || 1);
+      const latestCallSpeechKey = latestCallNumber
+        ? `${latestCallCount}-${numberToBingoLabel(latestCallNumber).replace('-', '-')}`
+        : '';
+      const latestSpeechText = buildJarvisSpeechText(latestCallMessage.content);
+      const speechWaitMs = estimateJarvisSpeechMs(latestSpeechText) + 900;
+      const requiredDelayMs = Math.max(1000, (round.callIntervalMs || BINGO_CALL_INTERVAL_MS) - 250, speechWaitMs);
+
+      if (jarvisVoiceEnabled && latestCallSpeechKey && lastBingoCallSpeechDoneKeyRef.current !== latestCallSpeechKey) {
+        if (Date.now() < jarvisVoiceBusyUntilRef.current) return;
+        if (elapsedMs < speechWaitMs) return;
+      }
+
+      if (elapsedMs < requiredDelayMs || Date.now() < jarvisVoiceBusyUntilRef.current) return;
     }
 
     if (calledNumbers.length >= 75) {

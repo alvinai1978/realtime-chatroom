@@ -370,3 +370,15 @@ npm run connect
 - Example call: `Call number one. B, twelve. I repeat, B, twelve. Mark it if it is on your card.`
 - Countdown, Bingo start, reset calls, winner, and invalid claim voice lines are now English-friendly.
 - Browser voice now prefers English voices when available and falls back to `en-US`.
+
+## v15.12 Tagalog Bingo Jokes + Wait-for-Voice Calls
+
+- Bingo voice lines are now Tagalog/Taglish.
+- Every Bingo called number includes a short Pinoy Bingo joke from Jarvis.
+- Jarvis waits for the current voice line/joke to finish before the next called number is posted.
+- Background music still ducks while Jarvis speaks.
+- ElevenLabs/cloud TTS remains the preferred voice output, with MP3 voice pack support still available.
+
+Example voice line:
+
+> Tawag bilang isa. B, labing dalawa. Ulitin ko, B, labing dalawa. Markahan kung nasa card ninyo. Relax lang mga ka-Bingo, hindi ito exam, pero bawal mangopya ng card ng katabi.
