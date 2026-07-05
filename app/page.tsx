@@ -1827,6 +1827,20 @@ export default function HomePage() {
       return;
     }
 
+    // v15.29: Keep only one audible LiveKit Jarvis track in the browser.
+    // Multiple LiveKit jobs/participants can briefly publish audio during reconnects;
+    // removing old attached audio elements prevents overlapping voices on TV/browser.
+    container.querySelectorAll<HTMLAudioElement>('[data-jarvis-livekit-audio]').forEach((oldAudio) => {
+      try {
+        oldAudio.pause();
+        oldAudio.srcObject = null;
+        oldAudio.removeAttribute('src');
+      } catch {
+        // Continue removing the stale audio element.
+      }
+      oldAudio.remove();
+    });
+
     try {
       const element = track.attach() as HTMLAudioElement;
       element.setAttribute('data-jarvis-livekit-audio', '1');
@@ -1842,7 +1856,7 @@ export default function HomePage() {
       element.style.left = '-10px';
       element.style.bottom = '-10px';
       container.appendChild(element);
-      setLiveKitVoiceStatus(`LiveKit audio attached from ${participantName}`);
+      setLiveKitVoiceStatus(`LiveKit single audio attached from ${participantName}`);
       void unlockAttachedLiveKitAudio();
     } catch (error) {
       console.warn('Could not attach LiveKit audio:', getErrorText(error));
@@ -2219,7 +2233,7 @@ export default function HomePage() {
       });
       room.on(RoomEvent.TrackSubscribed, (track: any, _publication: any, participant: any) => {
         attachLiveKitAudioTrack(track, participant?.identity || 'Jarvis');
-        if (String(track?.kind || '').toLowerCase() === 'audio') setLiveKitVoiceStatus('LiveKit Tagalog Agent audio attached');
+        if (String(track?.kind || '').toLowerCase() === 'audio') setLiveKitVoiceStatus('LiveKit Male Tagalog Agent audio attached');
       });
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
         detachLiveKitAudioTrack(track as { detach?: () => HTMLElement[] });
@@ -2267,6 +2281,10 @@ export default function HomePage() {
       window.speechSynthesis.cancel();
     }
     liveKitRoomRef.current?.disconnect();
+    liveKitAudioContainerRef.current?.querySelectorAll<HTMLAudioElement>('[data-jarvis-livekit-audio]').forEach((audio) => {
+      try { audio.pause(); } catch {}
+      audio.remove();
+    });
     liveKitRoomRef.current = null;
   }
 

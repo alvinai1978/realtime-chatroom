@@ -1,9 +1,15 @@
-# RIPPLE Jarvis Realtime Chatroom - v15.27 LiveKit Participant Gate Fix
+# RIPPLE Jarvis Realtime Chatroom - v15.29 LiveKit Anti-Overlap + Male Standard Tagalog Voice
 
 This package switches Jarvis voice back to **LiveKit Agent mode**.
 
-## What changed in v15.27
+## What changed in v15.29
 
+
+- **Anti-overlap fix:** the browser keeps only one attached LiveKit Jarvis audio track, so duplicate LiveKit jobs/tracks should no longer talk over each other.
+- **Primary job guard:** the voice agent now marks only the latest LiveKit job as primary and mutes/exits older jobs to prevent double speech.
+- **Duplicate message guard:** a message being spoken is locked so another job cannot speak the same Bingo call at the same time.
+- **Male standard Tagalog mode:** default voice settings are slower, calmer, and less slang/conyo. Agent instructions now ask for a clear male Filipino game-announcer delivery.
+- **Neutral emotion by default:** removed the overly excited default to reduce slang-sounding or exaggerated accent.
 - **Participant gate fix:** hindi na magsisimula ang voice session hangga't wala pang app/BingoTV participant sa LiveKit room. Ito ang main fix sa repeated `AgentSession is not running`.
 - **Bingo-only default:** hindi na babasahin ang trivia/game/random Jarvis messages by default. Bingo events lang para hindi ma-stuck sa non-Bingo message habang naghihintay ng session.
 - **No infinite queue loop:** kapag hindi pa rin masalita after retries, ise-skip ang message para hindi paulit-ulit sa same message forever.
@@ -43,7 +49,7 @@ npm install
 npm run build
 
 git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public scripts jarvis-voice-agent
-git commit -m "Fix LiveKit Jarvis session not running loop"
+git commit -m "Fix LiveKit voice overlap and set male standard Tagalog"
 git push
 vercel --prod
 ```
@@ -102,14 +108,15 @@ JARVIS_AGENT_POLL_MS=900
 JARVIS_TTS_MODEL=cartesia/sonic-3.5
 JARVIS_TTS_LANGUAGE=tl
 JARVIS_TTS_VOICE_ID=9626c31c-bec5-4cca-baa8-f8ba9e84c8bc
-JARVIS_TTS_SPEED=0.95
-JARVIS_TTS_VOLUME=1.15
-JARVIS_TTS_EMOTION=excited
+JARVIS_MALE_TAGALOG_STYLE=true
+JARVIS_TTS_SPEED=0.88
+JARVIS_TTS_VOLUME=1.10
+JARVIS_TTS_EMOTION=neutral
 
-JARVIS_MAX_TEXT_CHARS=360
-JARVIS_SAY_RETRY_COUNT=10
-JARVIS_SAY_RETRY_MS=900
-JARVIS_AFTER_SPEAK_PAUSE_MS=350
+JARVIS_MAX_TEXT_CHARS=330
+JARVIS_SAY_RETRY_COUNT=8
+JARVIS_SAY_RETRY_MS=1000
+JARVIS_AFTER_SPEAK_PAUSE_MS=500
 ```
 
 Then run:
@@ -182,3 +189,18 @@ Wait for `Connect callback received` and `LiveKit Inference TTS options`, then o
 - Adds clearer status messages when audio is attached or blocked.
 
 If logs show `Speaking LiveKit Tagalog` but no sound is heard, click **Jarvis Voice** again after the agent is connected.
+
+
+## v15.29 notes
+
+If voices overlap, stop all old Node agent processes first:
+
+```powershell
+Get-Process node | Stop-Process -Force
+cd D:\realtime-chatroom\jarvis-voice-agent
+npm run connect
+```
+
+Then open only one BingoTV/chatroom tab first, click **Jarvis Voice**, and start Bingo.
+
+The default voice ID remains the LiveKit/Cartesia sample voice. LiveKit documents that Cartesia TTS is available through LiveKit Inference without a separate Cartesia API key, and Sonic 3.5 supports the `tl` language code. If you find a better male Filipino voice in the LiveKit/Cartesia voice library later, replace only `JARVIS_TTS_VOICE_ID` in `jarvis-voice-agent/.env` and restart the agent.
