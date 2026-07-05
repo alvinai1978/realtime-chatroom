@@ -406,3 +406,23 @@ npm run connect
 Example voice line:
 
 > Tawag bilang isa. B, labing dalawa. Ulitin ko, B, labing dalawa. Markahan kung nasa card ninyo. Relax lang mga ka-Bingo, hindi ito exam, pero bawal mangopya ng card ng katabi.
+
+## v15.14 - Voice Auto Backup Fix
+
+- Jarvis now tries ElevenLabs / MP3 voice pack first.
+- If ElevenLabs fails because of API key, credits, paid voice restriction, voice ID, quota, or server error, Jarvis automatically uses browser backup voice instead of becoming silent.
+- Bingo call timing still waits for Jarvis to finish speaking before the next called number.
+- Tagalog first call + English repeat + Pinoy Bingo jokes from v15.13 remain active.
+
+Deploy:
+
+```powershell
+cd D:\realtime-chatroom
+npm install
+npm run build
+
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public
+git commit -m "Add Jarvis voice backup when ElevenLabs fails"
+git push
+vercel --prod
+```

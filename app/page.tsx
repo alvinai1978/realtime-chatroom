@@ -1977,46 +1977,24 @@ export default function HomePage() {
     return scoredVoices[0]?.voice || null;
   }
 
-  function speakJarvisText(text: string, force = false) {
-    if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
-
-    const voiceText = buildJarvisSpeechText(text);
-    if (!voiceText) return;
-
-    // v15.10: use server MP3 / ElevenLabs voice first on every device.
-    // No silent browser fallback here, so you can immediately know if ElevenLabs is not active.
-    const useCloudTts = true;
-
-    if (useCloudTts) {
-      setBingoMusicAudioVolume(true);
-      const busyMs = estimateJarvisSpeechMs(voiceText);
-      jarvisVoiceBusyUntilRef.current = Math.max(jarvisVoiceBusyUntilRef.current, Date.now() + busyMs);
-      void playCloudTtsVoice(voiceText, text)
-        .then(() => {
-          jarvisVoiceBusyUntilRef.current = Date.now() + 700;
-          const bingoCallMatch = text.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
-          if (bingoCallMatch) {
-            lastBingoCallSpeechDoneKeyRef.current = `${bingoCallMatch[1] || '1'}-${bingoCallMatch[2].toUpperCase()}-${bingoCallMatch[3]}`;
-          }
-        })
-        .catch((error) => {
-          const details = getErrorText(error);
-          console.warn('ElevenLabs/cloud TTS failed:', details);
-          setBingoMusicAudioVolume(false);
-          setLiveKitVoiceStatus(`ElevenLabs not active: ${details}`);
-          jarvisVoiceBusyUntilRef.current = Date.now() + busyMs;
-        });
-      return;
+  function markBingoCallSpeechDone(text: string) {
+    const bingoCallMatch = text.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
+    if (bingoCallMatch) {
+      lastBingoCallSpeechDoneKeyRef.current = `${bingoCallMatch[1] || '1'}-${bingoCallMatch[2].toUpperCase()}-${bingoCallMatch[3]}`;
     }
+  }
 
-    if (!('speechSynthesis' in window)) {
-      setLiveKitVoiceStatus('Voice not supported. Enable TV TTS mode or add MP3 voice pack.');
-      return;
+  function speakBrowserJarvisVoice(voiceText: string, originalText: string, statusPrefix = 'Browser backup voice active') {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      setBingoMusicAudioVolume(false);
+      setLiveKitVoiceStatus('Voice not supported. Check ElevenLabs or add MP3 voice pack.');
+      return false;
     }
 
     try {
       const selectedVoice = getJarvisMaleEnglishVoice();
       const utterance = new SpeechSynthesisUtterance(voiceText);
+      const busyMs = estimateJarvisSpeechMs(voiceText);
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
@@ -2025,18 +2003,60 @@ export default function HomePage() {
         utterance.lang = 'en-US';
       }
 
-      // Lower pitch + steady pace gives Jarvis a clearer male English-style delivery.
+      // Backup browser voice only. ElevenLabs or MP3 pack still has priority.
       utterance.rate = 0.9;
       utterance.pitch = 0.72;
       utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
-      utterance.onstart = () => setBingoMusicAudioVolume(true);
-      utterance.onend = () => setBingoMusicAudioVolume(false);
-      utterance.onerror = () => setBingoMusicAudioVolume(false);
+      utterance.onstart = () => {
+        setBingoMusicAudioVolume(true);
+        setLiveKitVoiceStatus(statusPrefix);
+        jarvisVoiceBusyUntilRef.current = Math.max(jarvisVoiceBusyUntilRef.current, Date.now() + busyMs);
+      };
+      utterance.onend = () => {
+        setBingoMusicAudioVolume(false);
+        jarvisVoiceBusyUntilRef.current = Date.now() + 700;
+        markBingoCallSpeechDone(originalText);
+      };
+      utterance.onerror = () => {
+        setBingoMusicAudioVolume(false);
+        jarvisVoiceBusyUntilRef.current = Date.now() + 1200;
+      };
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
+      return true;
     } catch (error) {
-      console.warn('Jarvis fallback voice skipped:', getErrorText(error));
+      console.warn('Jarvis browser backup voice skipped:', getErrorText(error));
+      setBingoMusicAudioVolume(false);
+      return false;
     }
+  }
+
+  function speakJarvisText(text: string, force = false) {
+    if (typeof window === 'undefined' || (!jarvisVoiceEnabled && !force)) return;
+
+    const voiceText = buildJarvisSpeechText(text);
+    if (!voiceText) return;
+
+    // v15.14: ElevenLabs/MP3 pack first, then browser backup voice if API key/credits/voice ID fails.
+    // This keeps Bingo speaking even when ElevenLabs has 401/402/404/quota errors.
+    setBingoMusicAudioVolume(true);
+    const busyMs = estimateJarvisSpeechMs(voiceText);
+    jarvisVoiceBusyUntilRef.current = Math.max(jarvisVoiceBusyUntilRef.current, Date.now() + busyMs);
+
+    void playCloudTtsVoice(voiceText, text)
+      .then(() => {
+        jarvisVoiceBusyUntilRef.current = Date.now() + 700;
+        markBingoCallSpeechDone(text);
+      })
+      .catch((error) => {
+        const details = getErrorText(error);
+        console.warn('ElevenLabs/cloud TTS failed, using browser backup voice:', details);
+        setLiveKitVoiceStatus(`ElevenLabs failed; using browser backup voice. ${details}`);
+        const didSpeak = speakBrowserJarvisVoice(voiceText, text, 'Browser backup voice active');
+        if (!didSpeak) {
+          jarvisVoiceBusyUntilRef.current = Date.now() + busyMs;
+        }
+      });
   }
 
   async function connectLiveKitVoiceRoom() {
