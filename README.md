@@ -1,13 +1,13 @@
-# RIPPLE Jarvis Realtime Chatroom - v15.26 LiveKit Ready Buffer Fix
+# RIPPLE Jarvis Realtime Chatroom - v15.27 LiveKit Participant Gate Fix
 
 This package switches Jarvis voice back to **LiveKit Agent mode**.
 
-## What changed in v15.26
+## What changed in v15.27
 
-- **Ready buffer fix:** kapag may Bingo message pero `AgentSession is not running` pa, hindi na itatapon ni Jarvis ang message; ire-retry muna niya hanggang ready ang LiveKit session.
-- **Single watcher guard:** kapag may duplicate LiveKit job request, ia-abort ang old poller para hindi doble-doble ang Supabase watcher.
-- **LiveKit timeout retry:** retryable `APITimeoutError` is retried before skipping.
-- **Light mode:** shorter max speech text and smaller polling batch para bumaba ang memory pressure.
+- **Participant gate fix:** hindi na magsisimula ang voice session hangga't wala pang app/BingoTV participant sa LiveKit room. Ito ang main fix sa repeated `AgentSession is not running`.
+- **Bingo-only default:** hindi na babasahin ang trivia/game/random Jarvis messages by default. Bingo events lang para hindi ma-stuck sa non-Bingo message habang naghihintay ng session.
+- **No infinite queue loop:** kapag hindi pa rin masalita after retries, ise-skip ang message para hindi paulit-ulit sa same message forever.
+- **Session start cleanup:** uses the official AgentSession start flow and waits briefly before greeting/polling.
 - Jarvis Voice now connects to the **LiveKit room** instead of using Azure, ElevenLabs, Microsoft browser TTS, or normal browser TTS.
 - The included `jarvis-voice-agent/` uses **LiveKit Inference + Cartesia Sonic 3.5**.
 - Default language is set to `tl` for Tagalog.
@@ -43,7 +43,7 @@ npm install
 npm run build
 
 git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public scripts jarvis-voice-agent
-git commit -m "Add LiveKit Jarvis ready buffer fix"
+git commit -m "Fix LiveKit Jarvis session not running loop"
 git push
 vercel --prod
 ```
@@ -67,7 +67,7 @@ wss://your-project.livekit.cloud
 
 Keep `LIVEKIT_API_SECRET` server-side only.
 
-## Run the Jarvis voice agent locally
+## Correct run order
 
 ```powershell
 cd D:\realtime-chatroom\jarvis-voice-agent
@@ -75,6 +75,16 @@ npm install
 copy .env.example .env
 notepad .env
 ```
+
+Important order:
+
+1. Start the agent first with `npm run connect`.
+2. Open app/BingoTV.
+3. Click **Jarvis Voice** so the browser joins the LiveKit room.
+4. The agent will then start the session and speak.
+5. Start Bingo.
+
+The agent now waits for a participant using `ctx.waitForParticipant()`, so it should not spam `AgentSession is not running` before the TV/browser joins.
 
 Fill in:
 
