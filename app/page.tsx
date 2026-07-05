@@ -145,7 +145,7 @@ const DEFAULT_SOUND_VOLUMES = { call: 0.8, winner: 0.85, invalid: 0.55, confetti
 const DEFAULT_BINGO_MUSIC_SRC = '/bingo-music.mp3';
 const BINGO_BACKGROUND_MUSIC_STORAGE_KEY = 'bingo_background_music_enabled';
 const WEBOS_TTS_STORAGE_KEY = 'ripple_webos_tts_mode';
-const WEBOS_VOICE_PACK_BASE = '/voices/bingo-en';
+const WEBOS_VOICE_PACK_BASE = '/voices/bingo-elevenlabs-tagalog';
 type SoundKey = keyof typeof DEFAULT_SOUND_VOLUMES;
 const BINGO_COLUMNS = [
   { letter: 'B', min: 1, max: 15 },
@@ -971,8 +971,8 @@ function numberToTagalogBingoVoiceLabel(number: number) {
 }
 
 function getPinoyBingoJoke(callNumber: number, calledNumber: number) {
-  // v15.13: 75 original Pinoy Bingo jokes so the joke does not repeat during a full 75-ball round.
-  // Inspired by classic bingo caller rhythm: short, clear, playful lines between official calls.
+  // v15.19: jokes are tied to the called number, not the call sequence.
+  // This keeps offline MP3 files reusable even when the random draw order changes.
   const jokes = [
     'Card check muna, hindi ito attendance pero present dapat ang number.',
     'Kung wala sa card, smile lang, baka nasa merienda ang swerte.',
@@ -1051,8 +1051,8 @@ function getPinoyBingoJoke(callNumber: number, calledNumber: number) {
     'Last stretch energy, mga ka-Bingo, baka ito na ang moment.'
   ];
 
-  const safeIndex = Math.max(0, Math.min(jokes.length - 1, callNumber - 1));
-  return jokes[safeIndex] || `Pinoy Bingo pause muna, call ${callNumber}, number ${calledNumber}, baka ito na ang hinahanap mo.`;
+  const safeIndex = Math.max(0, Math.min(jokes.length - 1, calledNumber - 1));
+  return jokes[safeIndex] || `Pinoy Bingo pause muna, next number ${numberToBingoLabel(calledNumber)}, baka ito na ang hinahanap mo.`;
 }
 
 function estimateJarvisSpeechMs(text: string) {
@@ -1724,12 +1724,13 @@ export default function HomePage() {
   function buildJarvisSpeechText(value: string) {
     const bingoCallMatch = value.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
     if (bingoCallMatch) {
-      const callCount = bingoCallMatch[1] ? Number(bingoCallMatch[1]) : 1;
       const number = Number(bingoCallMatch[3]);
-      const tagalogVoiceLabel = numberToTagalogBingoVoiceLabel(number);
-      const englishVoiceLabel = numberToBingoVoiceLabel(number);
-      const joke = getPinoyBingoJoke(callCount, number);
-      return `Tawag bilang ${numberToTagalogSpeech(callCount)}. ${tagalogVoiceLabel}. I repeat, ${englishVoiceLabel}. Markahan kung nasa card ninyo. ${joke}`;
+      const letter = bingoCallMatch[2].toUpperCase();
+      const englishNumber = numberToEnglishSpeech(number);
+      const joke = getPinoyBingoJoke(0, number);
+      // v15.20: Do not say draw sequence and do not say the extra marking reminder.
+      // Offline MP3 files are saved per Bingo number, so they must work in any random call order.
+      return `The next number is ${letter}, ${englishNumber}. I repeat, ${letter}, ${englishNumber}. ${joke}`;
     }
 
     const compact = cleanJarvisVoiceText(value);
@@ -1887,7 +1888,7 @@ export default function HomePage() {
       const response = await fetch(voicePackSrc, { method: 'HEAD', cache: 'force-cache' });
       if (!response.ok) return false;
       await playVoiceAudioUrl(voicePackSrc);
-      setLiveKitVoiceStatus('MP3 voice pack active');
+      setLiveKitVoiceStatus('Offline ElevenLabs MP3 voice pack active');
       return true;
     } catch {
       return false;
@@ -2114,8 +2115,8 @@ export default function HomePage() {
     setSoundEnabled(true);
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus('ElevenLabs cloud voice ready. Stable Jarvis volume, Tagalog first call, English repeat, no-repeat jokes.');
-    speakJarvisText('Naka-on na ang boses ni Jarvis. Ang unang tawag ay Tagalog, ang ulit ay English, at iba-iba ang Pinoy Bingo joke kada numero.', true);
+    setLiveKitVoiceStatus('Offline MP3 pack first, ElevenLabs cloud backup. Next-number voice format, no call-count mistakes.');
+    speakJarvisText('Naka-on na ang boses ni Jarvis. Gagamit muna ako ng offline MP3 voice pack kung naka-install na. Sasabihin ko ang next number, hindi ang call sequence, para tama kahit random ang draw order.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
     if (latestBingoCall) {
