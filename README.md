@@ -1,40 +1,22 @@
-# v15.22 First / Regular / Last Bingo Voice Pack Fix
+# RIPPLE Jarvis Realtime Chatroom - v15.25 LiveKit Tagalog Voice Restore
 
-Fix ito para sa MP3 generation bug kung saan parang ones digit lang ang nababasa, halimbawa `nine` imbes na `fifty nine`, or `eight` imbes na `twenty eight`.
+This package switches Jarvis voice back to **LiveKit Agent mode**.
 
-## Bagong voice format
+## What changed in v15.25
 
-Regular call:
+- Jarvis Voice now connects to the **LiveKit room** instead of using Azure, ElevenLabs, Microsoft browser TTS, or normal browser TTS.
+- The included `jarvis-voice-agent/` uses **LiveKit Inference + Cartesia Sonic 3.5**.
+- Default language is set to `tl` for Tagalog.
+- Default model is `cartesia/sonic-3.5`.
+- Default voice ID is set in `.env.example` so you can run immediately and then change later if you find a better LiveKit/Cartesia voice.
+- Bingo call format is fixed:
+  - First call: `Eto na ang unang numero. N, thirty four, number 34. I repeat, N, thirty four, number 34. [Pinoy Bingo joke]`
+  - Regular calls: `The next number is B, eight, number 8. I repeat, B, eight, number 8. [Pinoy Bingo joke]`
+  - Last call: `Eto na ang huling numero pang 75 na bola ay B, ten, number 10. I repeat, B, ten, number 10. [Pinoy Bingo joke]`
+- The app waits based on the estimated Jarvis speech time before calling the next Bingo number.
+- No Azure/ElevenLabs API key is needed for the LiveKit agent TTS path.
 
-```text
-The next number is G, fifty nine, number 59. I repeat, G, fifty nine, number 59. [Pinoy Bingo joke]
-```
-
-First call:
-
-```text
-Eto na ang unang numero. N, thirty four, number 34. I repeat, N, thirty four, number 34. [Pinoy Bingo joke]
-```
-
-Last call / 75th ball:
-
-```text
-Eto na ang huling numero, pang 75 na bola ay B, ten, number 10. I repeat, B, ten, number 10. [Pinoy Bingo joke]
-```
-
-## Important change
-
-Dati 75 MP3 files lang ang generated. Ngayon 225 MP3 files na:
-
-```text
-public/voices/bingo-elevenlabs-tagalog/regular/  -> 75 files
-public/voices/bingo-elevenlabs-tagalog/first/    -> 75 files
-public/voices/bingo-elevenlabs-tagalog/last/     -> 75 files
-```
-
-Kailangan ito dahil random ang first at last called number. Halimbawa puwedeng `N34` ang first call, or puwedeng `B10` ang last call.
-
-## Palitan
+## Replace these files
 
 ```text
 page.tsx                         -> app/page.tsx
@@ -46,66 +28,108 @@ app/api/livekit-token/route.ts   -> app/api/livekit-token/route.ts
 app/api/tts/route.ts             -> app/api/tts/route.ts
 public/                          -> public/
 scripts/                         -> scripts/
+jarvis-voice-agent/              -> jarvis-voice-agent/
 ```
 
-## Generate new offline MP3 pack
-
-Dahil iba na ang format, gamitin muna ang `-Overwrite`:
+## Deploy the Next.js app
 
 ```powershell
 cd D:\realtime-chatroom
-Set-ExecutionPolicy -Scope Process Bypass -Force
-
-$tts = "https://realtime-chatroom-orpin.vercel.app/api/tts"
-
-.\scripts\generate-bingo-elevenlabs-mp3-pack.ps1 `
-  -TtsEndpoint $tts `
-  -UsbDir "E:\bingo-elevenlabs-tagalog" `
-  -DelayMs 3500 `
-  -RetryCount 8 `
-  -RetryDelayMs 7000 `
-  -Overwrite
-```
-
-## Resume kung naputol
-
-Kapag naputol dahil 502/rate limit, ulitin pero tanggalin ang `-Overwrite` para missing files lang ang ituloy:
-
-```powershell
-.\scripts\generate-bingo-elevenlabs-mp3-pack.ps1 `
-  -TtsEndpoint $tts `
-  -UsbDir "E:\bingo-elevenlabs-tagalog" `
-  -DelayMs 3500 `
-  -RetryCount 8 `
-  -RetryDelayMs 7000
-```
-
-## Check complete pack
-
-```powershell
-.\scripts\test-offline-voice-pack.ps1
-```
-
-Expected:
-
-```text
-OK: Complete 225 MP3 voice pack found
-```
-
-## Test sample files
-
-```powershell
-Start-Process .\public\voices\bingo-elevenlabs-tagalog\regular\g-59.mp3
-Start-Process .\public\voices\bingo-elevenlabs-tagalog\first\n-34.mp3
-Start-Process .\public\voices\bingo-elevenlabs-tagalog\last\b-10.mp3
-```
-
-## Deploy after successful generation
-
-```powershell
+npm install
 npm run build
-git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public scripts
-git commit -m "Fix Bingo MP3 voice pack first regular last calls"
+
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public scripts jarvis-voice-agent
+git commit -m "Restore LiveKit Tagalog Jarvis voice agent"
 git push
 vercel --prod
 ```
+
+## Required Vercel env for the web app
+
+The app still needs LiveKit token generation:
+
+```powershell
+vercel env add LIVEKIT_URL production
+vercel env add LIVEKIT_API_KEY production
+vercel env add LIVEKIT_API_SECRET production
+vercel --prod
+```
+
+`LIVEKIT_URL` example:
+
+```text
+wss://your-project.livekit.cloud
+```
+
+Keep `LIVEKIT_API_SECRET` server-side only.
+
+## Run the Jarvis voice agent locally
+
+```powershell
+cd D:\realtime-chatroom\jarvis-voice-agent
+npm install
+copy .env.example .env
+notepad .env
+```
+
+Fill in:
+
+```env
+LIVEKIT_URL=wss://your-livekit-project.livekit.cloud
+LIVEKIT_API_KEY=your-livekit-api-key
+LIVEKIT_API_SECRET=your-livekit-api-secret
+
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-publishable-or-anon-key
+
+JARVIS_AGENT_ROOM=main-room
+JARVIS_AGENT_POLL_MS=900
+
+JARVIS_TTS_MODEL=cartesia/sonic-3.5
+JARVIS_TTS_LANGUAGE=tl
+JARVIS_TTS_VOICE_ID=9626c31c-bec5-4cca-baa8-f8ba9e84c8bc
+JARVIS_TTS_SPEED=0.95
+JARVIS_TTS_VOLUME=1.15
+JARVIS_TTS_EMOTION=excited
+```
+
+Then run:
+
+```powershell
+npm run connect
+```
+
+Keep that PowerShell window open while Bingo is running.
+
+## Test
+
+1. Open the deployed chatroom or BingoTV.
+2. Click **Jarvis Voice**.
+3. Make sure the PowerShell window says the agent is registered and connected.
+4. Start Bingo.
+5. Jarvis should speak through LiveKit, in Tagalog/Taglish style.
+
+## Change voice later
+
+If the default voice does not sound good enough, replace only this value in `jarvis-voice-agent/.env`:
+
+```env
+JARVIS_TTS_VOICE_ID=your-better-livekit-cartesia-voice-id
+```
+
+Restart the agent:
+
+```powershell
+Ctrl + C
+npm run connect
+```
+
+## Notes
+
+- LiveKit Inference does not require a separate Cartesia API key.
+- Usage and limits are handled in your LiveKit Cloud project.
+- If you hear no voice, check that:
+  - The web app has LiveKit env vars in Vercel production.
+  - `jarvis-voice-agent` is running.
+  - The `.env` file has Supabase URL/key so the agent can read messages.
+  - You clicked **Jarvis Voice** in the app or BingoTV.

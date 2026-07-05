@@ -145,7 +145,7 @@ const DEFAULT_SOUND_VOLUMES = { call: 0.8, winner: 0.85, invalid: 0.55, confetti
 const DEFAULT_BINGO_MUSIC_SRC = '/bingo-music.mp3';
 const BINGO_BACKGROUND_MUSIC_STORAGE_KEY = 'bingo_background_music_enabled';
 const WEBOS_TTS_STORAGE_KEY = 'ripple_webos_tts_mode';
-const WEBOS_VOICE_PACK_BASE = '/voices/bingo-elevenlabs-tagalog';
+const WEBOS_VOICE_PACK_BASE = '/voices/bingo-filipino-neural';
 type SoundKey = keyof typeof DEFAULT_SOUND_VOLUMES;
 const BINGO_COLUMNS = [
   { letter: 'B', min: 1, max: 15 },
@@ -1354,6 +1354,7 @@ export default function HomePage() {
   const bingoMusicAudioRef = useRef<HTMLAudioElement | null>(null);
   const jarvisVoiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioSequenceRef = useRef(0);
+  const liveKitVoiceTimerRef = useRef<number | null>(null);
   const bingoMusicObjectUrlRef = useRef<string | null>(null);
   const liveKitRoomRef = useRef<{ disconnect: () => void; startAudio?: () => Promise<void> } | null>(null);
   const liveKitAudioContainerRef = useRef<HTMLDivElement | null>(null);
@@ -1905,7 +1906,7 @@ export default function HomePage() {
       // Background music volume changes can no longer lower Jarvis every call interval.
       audio.volume = Math.max(0.55, Math.min(1, soundVolumes.call || 0.9));
       await audio.play();
-      setLiveKitVoiceStatus(webOsTtsMode || isLikelyWebOsTv() ? 'webOS TV voice playing - stable volume' : 'ElevenLabs voice playing - stable volume');
+      setLiveKitVoiceStatus(webOsTtsMode || isLikelyWebOsTv() ? 'webOS TV voice playing - stable volume' : 'Microsoft Filipino neural voice playing - stable volume');
       await waitForAudioEnd(audio, sequence);
     } finally {
       if (sequence === voiceAudioSequenceRef.current) {
@@ -1927,7 +1928,7 @@ export default function HomePage() {
         const response = await fetch(voicePackSrc, { method: 'HEAD', cache: 'force-cache' });
         if (!response.ok) continue;
         await playVoiceAudioUrl(voicePackSrc);
-        setLiveKitVoiceStatus('Offline ElevenLabs MP3 voice pack active');
+        setLiveKitVoiceStatus('Offline Microsoft Filipino neural MP3 voice pack active');
         return true;
       } catch {
         // Try the next candidate, or fall back to cloud TTS after the loop.
@@ -1963,7 +1964,7 @@ export default function HomePage() {
     const objectUrl = URL.createObjectURL(audioBlob);
     try {
       await playVoiceAudioUrl(objectUrl);
-      setLiveKitVoiceStatus('Cloud TTS voice active');
+      setLiveKitVoiceStatus('Microsoft Filipino neural cloud TTS active');
       return true;
     } finally {
       URL.revokeObjectURL(objectUrl);
@@ -2025,7 +2026,7 @@ export default function HomePage() {
   function speakBrowserJarvisVoice(voiceText: string, originalText: string, statusPrefix = 'Browser backup voice active') {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setBingoMusicAudioVolume(false);
-      setLiveKitVoiceStatus('Voice not supported. Check ElevenLabs or add MP3 voice pack.');
+      setLiveKitVoiceStatus('Voice not supported. Check Microsoft Azure Speech env or add MP3 voice pack.');
       return false;
     }
 
@@ -2075,24 +2076,25 @@ export default function HomePage() {
     const voiceText = buildJarvisSpeechText(text);
     if (!voiceText) return;
 
-    // v15.15: Strict ElevenLabs/MP3 voice mode.
-    // Do not use normal browser TTS backup, so users can clearly hear only the selected ElevenLabs/custom voice.
+    // v15.25: LiveKit-only voice mode.
+    // The separate jarvis-voice-agent speaks through LiveKit Inference.
+    // This browser only reserves the speaking window so Bingo waits before the next number.
     setBingoMusicAudioVolume(true);
-    const busyMs = estimateJarvisSpeechMs(voiceText);
+    const busyMs = estimateJarvisSpeechMs(voiceText) + 900;
     jarvisVoiceBusyUntilRef.current = Math.max(jarvisVoiceBusyUntilRef.current, Date.now() + busyMs);
+    setLiveKitVoiceStatus('LiveKit Tagalog voice speaking / waiting before next call');
 
-    void playCloudTtsVoice(voiceText, text)
-      .then(() => {
-        jarvisVoiceBusyUntilRef.current = Date.now() + 700;
-        markBingoCallSpeechDone(text);
-      })
-      .catch((error) => {
-        const details = getErrorText(error);
-        console.warn('ElevenLabs/cloud TTS failed. Normal browser TTS backup is disabled:', details);
-        setBingoMusicAudioVolume(false);
-        setLiveKitVoiceStatus(`ElevenLabs voice failed. Normal TTS disabled. ${details}`);
-        jarvisVoiceBusyUntilRef.current = Date.now() + 1200;
-      });
+    if (liveKitVoiceTimerRef.current) {
+      window.clearTimeout(liveKitVoiceTimerRef.current);
+    }
+
+    liveKitVoiceTimerRef.current = window.setTimeout(() => {
+      setBingoMusicAudioVolume(false);
+      jarvisVoiceBusyUntilRef.current = Date.now() + 700;
+      markBingoCallSpeechDone(text);
+      setLiveKitVoiceStatus('LiveKit Tagalog voice ready for next call');
+      liveKitVoiceTimerRef.current = null;
+    }, busyMs);
   }
 
   async function connectLiveKitVoiceRoom() {
@@ -2119,13 +2121,13 @@ export default function HomePage() {
       liveKitAudioContainerRef.current?.querySelectorAll('[data-jarvis-livekit-audio]').forEach((element) => element.remove());
 
       const room = new Room({ adaptiveStream: true, dynacast: true });
-      room.on(RoomEvent.Connected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Jarvis Voice Agent'));
+      room.on(RoomEvent.Connected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Tagalog Jarvis agent'));
       room.on(RoomEvent.Disconnected, () => setLiveKitVoiceStatus('LiveKit voice disconnected'));
       room.on(RoomEvent.Reconnecting, () => setLiveKitVoiceStatus('LiveKit reconnecting...'));
-      room.on(RoomEvent.Reconnected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Jarvis Voice Agent'));
+      room.on(RoomEvent.Reconnected, () => setLiveKitVoiceStatus('LiveKit connected. Waiting for Tagalog Jarvis agent'));
       room.on(RoomEvent.TrackSubscribed, (track) => {
         attachLiveKitAudioTrack(track as { kind?: string; attach?: () => HTMLElement });
-        if ((track as { kind?: string }).kind === 'audio') setLiveKitVoiceStatus('LiveKit Agent voice active');
+        if ((track as { kind?: string }).kind === 'audio') setLiveKitVoiceStatus('LiveKit Tagalog Agent voice active');
       });
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
         detachLiveKitAudioTrack(track as { detach?: () => HTMLElement[] });
@@ -2134,40 +2136,33 @@ export default function HomePage() {
       await room.connect(data.url, data.token);
       liveKitRoomRef.current = room;
       await room.startAudio?.();
-      setLiveKitVoiceStatus('LiveKit connected. Start/run Jarvis Voice Agent');
+      setLiveKitVoiceStatus('LiveKit connected. Run jarvis-voice-agent if no voice is heard');
     } catch (error) {
-      setLiveKitVoiceStatus(`LiveKit unavailable. ElevenLabs/custom voice mode remains active. ${getErrorText(error)}`);
+      setLiveKitVoiceStatus(`LiveKit unavailable. Run jarvis-voice-agent and check LiveKit env. ${getErrorText(error)}`);
     }
   }
 
   function enableJarvisVoice() {
     if (typeof window === 'undefined') return;
-    if ('speechSynthesis' in window) {
-      // Some browsers load voices only after this call/user interaction.
-      window.speechSynthesis.getVoices();
-    }
 
-    // v15.16: force server MP3 / ElevenLabs mode with separate stable voice audio.
-    setWebOsTtsMode(true);
-    localStorage.setItem(WEBOS_TTS_STORAGE_KEY, '1');
+    // v15.25: LiveKit Tagalog Agent mode. No Azure, ElevenLabs, Microsoft, or browser TTS.
+    setWebOsTtsMode(false);
+    localStorage.removeItem(WEBOS_TTS_STORAGE_KEY);
     getJarvisVoiceAudioElement();
 
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
-    liveKitRoomRef.current?.disconnect();
-    liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus('Offline MP3 pack first, ElevenLabs cloud backup. First/regular/last call voice format enabled.');
-    speakJarvisText('Naka-on na ang boses ni Jarvis. Gagamit muna ako ng offline MP3 voice pack kung naka-install na. May special intro para sa unang bola, regular next number sa gitna, at huling bola sa pang pitumpu at lima.', true);
-
-    const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
-    if (latestBingoCall) {
-      window.setTimeout(() => speakJarvisText(`Last call: ${latestBingoCall.content}`, true), 900);
-    }
+    setLiveKitVoiceStatus('Connecting to LiveKit Tagalog voice room...');
+    void connectLiveKitVoiceRoom();
   }
 
   function disableJarvisVoice() {
     voiceAudioSequenceRef.current += 1;
+    if (liveKitVoiceTimerRef.current) {
+      window.clearTimeout(liveKitVoiceTimerRef.current);
+      liveKitVoiceTimerRef.current = null;
+    }
     jarvisVoiceAudioRef.current?.pause();
     jarvisVoiceAudioRef.current?.removeAttribute('src');
     jarvisVoiceAudioRef.current?.load();
@@ -3167,6 +3162,7 @@ export default function HomePage() {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      if (liveKitVoiceTimerRef.current) window.clearTimeout(liveKitVoiceTimerRef.current);
       liveKitRoomRef.current?.disconnect();
       bingoMusicAudioRef.current?.pause();
       if (bingoMusicObjectUrlRef.current) URL.revokeObjectURL(bingoMusicObjectUrlRef.current);
@@ -4020,7 +4016,7 @@ export default function HomePage() {
               <Music size={18} /> {bingoMusicEnabled ? 'Music On' : 'Play Music'}
             </button>
             <button type="button" onClick={enterBingoTvFullscreen}>Fullscreen</button>
-            <span className="jarvis-voice-status">{webOsTtsMode ? 'webOS TV audio mode · ' : ''}{liveKitVoiceStatus} · {bingoMusicStatus}</span>
+            <span className="jarvis-voice-status">{liveKitVoiceStatus} · {bingoMusicStatus}</span>
           </div>
         </section>
       </main>
