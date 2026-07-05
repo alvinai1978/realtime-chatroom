@@ -1,3 +1,27 @@
+# RIPPLE Jarvis Realtime Chatroom - v15.13 Tagalog First Call + English Repeat + No-Repeat Pinoy Bingo Jokes
+
+New in v15.13:
+
+- Jarvis reads each Bingo number first in Tagalog, then repeats it in English.
+  - Example: `Tawag bilang isa. B, labing dalawa. I repeat, B, twelve.`
+- Added 75 original Pinoy Bingo joke lines so jokes do not repeat during one full 75-ball round.
+- The host loop still waits for the voice/joke sequence to finish before drawing the next number.
+- Joke style is inspired by traditional bingo caller culture: short playful lines between calls, clear number confirmation, and entertainment while keeping the official call understandable.
+
+Deploy files from this package, then run:
+
+```powershell
+cd D:\realtime-chatroom
+npm install
+npm run build
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public
+git commit -m "Make Bingo Tagalog first with English repeat and no-repeat jokes"
+git push
+vercel --prod
+```
+
+---
+
 # RIPPLE Jarvis Realtime Chatroom - v15.11 ElevenLabs Buffered TTS Debug Fix
 
 This update changes `/api/tts` from ElevenLabs streaming proxy mode to a buffered MP3 conversion mode for better Vercel and LG webOS compatibility. It also adds debug mode so POST errors return clear JSON instead of a silent 502.

@@ -971,21 +971,88 @@ function numberToTagalogBingoVoiceLabel(number: number) {
 }
 
 function getPinoyBingoJoke(callNumber: number, calledNumber: number) {
+  // v15.13: 75 original Pinoy Bingo jokes so the joke does not repeat during a full 75-ball round.
+  // Inspired by classic bingo caller rhythm: short, clear, playful lines between official calls.
   const jokes = [
-    'Relax lang mga ka-Bingo, hindi ito exam, pero bawal mangopya ng card ng katabi.',
-    'Kung wala sa card ninyo, ngumiti lang. Baka nasa puso ninyo ang panalo.',
-    'Ang unang mag-Bingo, libre ang kaba. Ang hindi pa, kapit lang sa dauber.',
-    'Markahan nang maayos, huwag parang attendance sa barangay meeting.',
-    'Kapag malapit na kayo, huminga muna. Baka false alarm na naman iyan.',
-    'Sa Bingo, bawal ang marupok. Official called numbers lang ang susundin.',
-    'Kung hindi lumabas ang numero mo, huwag tampo. May next draw pa, parang next episode ng teleserye.',
-    'Check muna bago sumigaw ng Bingo. Baka B na B lang ang confidence.',
-    'Mga ka-Bingo, steady lang. Hindi porke may apat ka na, winner ka na agad.',
-    'Kapag nanalo ka, smile muna bago celebration. Para ready sa winner report.',
-    'Kung kinakabahan ka, normal iyan. Bingo iyan, hindi lang laro, cardio rin.',
-    'Paki-check ang cards. Baka nasa ilalim ng chichirya ang hinahanap mong number.'
+    'Card check muna, hindi ito attendance pero present dapat ang number.',
+    'Kung wala sa card, smile lang, baka nasa merienda ang swerte.',
+    'Kalma mga ka-Bingo, hindi pa ito pila sa ayuda.',
+    'Markahan nang maayos, huwag parang resibo na nawawala.',
+    'Kung kinakabahan ka, normal yan, Bingo cardio talaga ito.',
+    'Bawal mandaya, mas mabilis makahalata si Jarvis kaysa kapitbahay.',
+    'Kapag malapit na, huminga muna, baka false alarm lang.',
+    'Ang dauber ay pangmarka, hindi pangkulay ng buong barangay.',
+    'Kung tahimik ang mesa, ibig sabihin may naghihintay ng isang number.',
+    'Huwag muna magcelebrate, baka kulang pa ng isang kanto.',
+    'Check mo ang card, baka tinakpan ng chichirya ang panalo.',
+    'Bingo night ito, pero parang finals week ang kaba.',
+    'Kapag hindi lumabas ang number, huwag tampo, may next draw pa.',
+    'Yung malapit na manalo, biglang nagiging mathematician sa card.',
+    'Steady lang, hindi porke apat na marka, may trophy na agad.',
+    'Kung may nanay na tahimik, delikado, baka one number away na.',
+    'Pamaypay mode muna habang naghihintay ng swerte.',
+    'Ang tunay na ka-Bingo, marunong maghintay at magmeryenda.',
+    'Kung mali ang mark, undo sa isip, pero sa card ingat.',
+    'Walang sisihan kapag nalagpasan ang number, replay sa tenga lang.',
+    'Sa Bingo, ang pinakamalakas minsan yung pinakatahimik sa gilid.',
+    'Kapag may sumigaw agad, verify muna bago palakpakan.',
+    'Huwag kabahan, numero lang yan, hindi electric bill.',
+    'Sari-sari ang cards, pero iisa ang pangarap: Bingo.',
+    'Kung wala ka pa ring mark, warm-up pa lang daw sabi ng swerte.',
+    'Yung naghahanap ng number, parang naghahanap ng sukli sa bulsa.',
+    'Official calls lang, hindi counted ang hula ng katabi.',
+    'Kapag may tumatawa, baka wala sa card, pero may joke naman.',
+    'Ingat sa pagmarka, hindi ito connect-the-dots ng pamangkin.',
+    'Kung one away ka na, bawal munang kumurap.',
+    'Ang swerte sa Bingo, minsan late pero dramatic ang dating.',
+    'Check row, check column, check diagonal, parang inspection day.',
+    'Kung hindi mo makita, baka hindi talaga siya tinawag, bes.',
+    'Relax lang, hindi porke tahimik si Jarvis, walang plano ang bola.',
+    'Bingo muna bago overthinking.',
+    'Kapag nanalo ka, smile muna, screenshot follows.',
+    'Ang card na walang mark, may character development pa.',
+    'Kung may kape ka, kapit lang, mahaba-habang laban ito.',
+    'Huwag iwan ang card, baka dumating ang number pag tayo mo.',
+    'Kapag sabay-sabay nagcheck, ibig sabihin mainit na ang round.',
+    'Hindi kailangan sumigaw ng malakas, kailangan valid ang pattern.',
+    'Kung may lucky pen ka, gamitin mo na, baka kailangan ng moral support.',
+    'Bingo wisdom: markahan ang tinawag, hindi ang inaasam.',
+    'Kapag wala pa rin, isipin mo na lang nag-iipon ng suspense.',
+    'Bawal mainip, ang swerte minsan traffic sa EDSA.',
+    'Yung isang number na lang, parang cliffhanger sa teleserye.',
+    'Markahan kung meron, kung wala, nod politely na lang.',
+    'Huwag pakopya ng card, individual event ito mga ka-Bingo.',
+    'Kapag nagkamali ng claim, smile lang, practice round ng confidence.',
+    'Ang winner, verified muna bago celebrity wave.',
+    'Kung narinig mo pero wala sa card, at least clear ang speaker.',
+    'Sa Bingo, may strategy, may swerte, at may konting dasal.',
+    'Kapag biglang tumahimik ang grupo, may malapit nang sumigaw.',
+    'Walang drama sa missing number, may bola pang darating.',
+    'Card muna bago chismis, baka nandiyan na ang panalo.',
+    'Kung may lola sa table, respeto, veteran mode yan.',
+    'Ang tunay na thrill, yung hinahanap mong number ay nagtatago.',
+    'Huwag malito, letter muna bago number, parang address ng swerte.',
+    'Pag may pattern na, doble check bago maging legend.',
+    'Hindi lahat ng malapit panalo, minsan teaser lang.',
+    'Keep calm and daub responsibly.',
+    'Kung hindi tumama, okay lang, may background music naman.',
+    'Yung card mo tahimik, pero baka biglang bumawi sa dulo.',
+    'Sa Bingo, walang late reaction, mark agad kapag sure.',
+    'Bawal magic marker sa hindi tinawag, may audit si Jarvis.',
+    'Kapag may kumanta ng Bingo, ibig sabihin excited na ang barangay.',
+    'One number away? Huwag gagalaw, baka mawala ang signal ng swerte.',
+    'Kung panalo na, huwag kalimutang huminga bago magclaim.',
+    'Ang bola ay bilog, kaya umiikot din ang swerte.',
+    'Kapag hindi mo card, huwag i-coach, baka ikaw pa ang malito.',
+    'Bingo tip: tingin sa card, hindi sa mukha ng kalaban.',
+    'Kung malamig ang numbers mo, painitin natin sa next call.',
+    'Minsan ang panalo nasa huling tawag, parang plot twist.',
+    'Kapag may nagtanong ulit, sagot: official called numbers lang.',
+    'Last stretch energy, mga ka-Bingo, baka ito na ang moment.'
   ];
-  return jokes[(callNumber + calledNumber) % jokes.length];
+
+  const safeIndex = Math.max(0, Math.min(jokes.length - 1, callNumber - 1));
+  return jokes[safeIndex] || `Pinoy Bingo pause muna, call ${callNumber}, number ${calledNumber}, baka ito na ang hinahanap mo.`;
 }
 
 function estimateJarvisSpeechMs(text: string) {
@@ -1658,9 +1725,10 @@ export default function HomePage() {
     if (bingoCallMatch) {
       const callCount = bingoCallMatch[1] ? Number(bingoCallMatch[1]) : 1;
       const number = Number(bingoCallMatch[3]);
-      const voiceLabel = numberToTagalogBingoVoiceLabel(number);
+      const tagalogVoiceLabel = numberToTagalogBingoVoiceLabel(number);
+      const englishVoiceLabel = numberToBingoVoiceLabel(number);
       const joke = getPinoyBingoJoke(callCount, number);
-      return `Tawag bilang ${numberToTagalogSpeech(callCount)}. ${voiceLabel}. Ulitin ko, ${voiceLabel}. Markahan kung nasa card ninyo. ${joke}`;
+      return `Tawag bilang ${numberToTagalogSpeech(callCount)}. ${tagalogVoiceLabel}. I repeat, ${englishVoiceLabel}. Markahan kung nasa card ninyo. ${joke}`;
     }
 
     const compact = cleanJarvisVoiceText(value);
@@ -2034,8 +2102,8 @@ export default function HomePage() {
     setSoundEnabled(true);
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus('ElevenLabs cloud voice mode ready. If it fails, normal browser TTS will not play.');
-    speakJarvisText('Naka-on na ang boses ni Jarvis. Babasahin ko ang Bingo sa Tagalog, may konting Pinoy Bingo joke kada tawag.', true);
+    setLiveKitVoiceStatus('ElevenLabs cloud voice mode ready. Tagalog first call, English repeat, no-repeat jokes.');
+    speakJarvisText('Naka-on na ang boses ni Jarvis. Ang unang tawag ay Tagalog, ang ulit ay English, at iba-iba ang Pinoy Bingo joke kada numero.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
     if (latestBingoCall) {
