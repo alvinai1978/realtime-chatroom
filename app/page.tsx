@@ -1352,6 +1352,7 @@ export default function HomePage() {
   const jarvisVoiceBusyUntilRef = useRef(0);
   const lastBingoCallSpeechDoneKeyRef = useRef('');
   const bingoMusicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const jarvisVoiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const voiceAudioSequenceRef = useRef(0);
   const bingoMusicObjectUrlRef = useRef<string | null>(null);
   const liveKitRoomRef = useRef<{ disconnect: () => void; startAudio?: () => Promise<void> } | null>(null);
@@ -1806,8 +1807,18 @@ export default function HomePage() {
     return `${WEBOS_VOICE_PACK_BASE}/${letter}-${number}.mp3`;
   }
 
-  function getSharedAudioElementForVoice() {
-    return getBingoMusicAudio();
+  function getJarvisVoiceAudioElement() {
+    if (typeof window === 'undefined') return null;
+
+    if (!jarvisVoiceAudioRef.current) {
+      const audio = new Audio();
+      audio.loop = false;
+      audio.preload = 'auto';
+      audio.setAttribute('playsinline', 'true');
+      jarvisVoiceAudioRef.current = audio;
+    }
+
+    return jarvisVoiceAudioRef.current;
   }
 
   async function waitForAudioEnd(audio: HTMLAudioElement, sequence: number) {
@@ -1842,47 +1853,31 @@ export default function HomePage() {
 
   async function playVoiceAudioUrl(audioSrc: string) {
     const sequence = (voiceAudioSequenceRef.current += 1);
-    const audio = getSharedAudioElementForVoice();
+    const audio = getJarvisVoiceAudioElement();
     if (!audio) return;
-
-    const musicRound = isBingoTvMode ? bingoTvRound : activeBingoRound;
-    const shouldResumeMusic = bingoMusicEnabled && Boolean(musicRound?.roundId);
-    const previousSrc = audio.src;
-    const previousCurrentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-    const previousLoop = audio.loop;
-    const previousWasPlaying = !audio.paused;
 
     try {
       audio.pause();
       audio.loop = false;
-      audio.volume = Math.max(0.2, Math.min(1, soundVolumes.call || 0.8));
       audio.src = audioSrc;
       audio.load();
+
+      // v15.16: Jarvis voice now uses its own audio element.
+      // Background music volume changes can no longer lower Jarvis every call interval.
+      audio.volume = Math.max(0.55, Math.min(1, soundVolumes.call || 0.9));
       await audio.play();
-      setLiveKitVoiceStatus(webOsTtsMode || isLikelyWebOsTv() ? 'webOS TV voice playing' : 'Cloud voice playing');
+      setLiveKitVoiceStatus(webOsTtsMode || isLikelyWebOsTv() ? 'webOS TV voice playing - stable volume' : 'ElevenLabs voice playing - stable volume');
       await waitForAudioEnd(audio, sequence);
     } finally {
       if (sequence === voiceAudioSequenceRef.current) {
         audio.pause();
-        audio.loop = previousLoop;
-        audio.src = previousSrc || bingoMusicSrc;
+        audio.removeAttribute('src');
         audio.load();
-
-        try {
-          if (previousSrc) audio.currentTime = previousCurrentTime;
-        } catch {
-          // Some TV browsers do not allow restoring currentTime until metadata is ready.
-        }
-
         setBingoMusicAudioVolume(false);
-        if (shouldResumeMusic || previousWasPlaying) {
-          void audio.play().catch((error) => {
-            console.warn('Could not resume music after voice:', getErrorText(error));
-          });
-        }
       }
     }
   }
+
 
   async function tryPlayBingoVoicePack(value: string) {
     const voicePackSrc = getBingoVoicePackSrc(value);
@@ -2006,7 +2001,7 @@ export default function HomePage() {
       // Backup browser voice only. ElevenLabs or MP3 pack still has priority.
       utterance.rate = 0.9;
       utterance.pitch = 0.72;
-      utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
+      utterance.volume = Math.max(0.55, Math.min(1, soundVolumes.call || 0.9));
       utterance.onstart = () => {
         setBingoMusicAudioVolume(true);
         setLiveKitVoiceStatus(statusPrefix);
@@ -2109,18 +2104,17 @@ export default function HomePage() {
       window.speechSynthesis.getVoices();
     }
 
-    // v15.10: force server MP3 / ElevenLabs mode.
-    const shouldUseTvSafeVoice = true;
+    // v15.16: force server MP3 / ElevenLabs mode with separate stable voice audio.
     setWebOsTtsMode(true);
     localStorage.setItem(WEBOS_TTS_STORAGE_KEY, '1');
-    getSharedAudioElementForVoice();
+    getJarvisVoiceAudioElement();
 
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus('ElevenLabs cloud voice mode ready. Tagalog first call, English repeat, no-repeat jokes.');
+    setLiveKitVoiceStatus('ElevenLabs cloud voice ready. Stable Jarvis volume, Tagalog first call, English repeat, no-repeat jokes.');
     speakJarvisText('Naka-on na ang boses ni Jarvis. Ang unang tawag ay Tagalog, ang ulit ay English, at iba-iba ang Pinoy Bingo joke kada numero.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
@@ -2131,6 +2125,9 @@ export default function HomePage() {
 
   function disableJarvisVoice() {
     voiceAudioSequenceRef.current += 1;
+    jarvisVoiceAudioRef.current?.pause();
+    jarvisVoiceAudioRef.current?.removeAttribute('src');
+    jarvisVoiceAudioRef.current?.load();
     setJarvisVoiceEnabled(false);
     setLiveKitVoiceStatus('Voice off');
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {

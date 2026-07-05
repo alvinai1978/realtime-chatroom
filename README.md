@@ -1,3 +1,31 @@
+# RIPPLE Jarvis Realtime Chatroom - v15.16 Stable Jarvis Voice Volume Fix
+
+New in v15.16:
+
+- Fixed the issue where Jarvis voice could suddenly get quieter around each call interval.
+- Jarvis ElevenLabs/server MP3 voice now uses a **separate audio element** from the Bingo background music.
+- Background music volume changes no longer affect Jarvis voice volume.
+- Jarvis call voice is locked to the Call Volume slider with a safer minimum volume.
+- Keeps v15.15 behavior: strict ElevenLabs/MP3 voice only, no normal browser TTS fallback.
+- Keeps Tagalog first call, English repeat, Pinoy Bingo jokes, and wait-for-voice before the next call.
+
+Deploy files from this package, then run:
+
+```powershell
+cd D:\realtime-chatroom
+npm install
+npm run build
+
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public
+git commit -m "Fix Jarvis voice volume dropping during Bingo calls"
+git push
+vercel --prod
+```
+
+After deploy, click **Jarvis Voice**, then start Bingo. If background music is on, it can still be lowered/restored separately, but Jarvis voice itself should no longer dip every call interval.
+
+---
+
 # RIPPLE Jarvis Realtime Chatroom - v15.15 Strict ElevenLabs / No Normal TTS Fallback
 
 New in v15.15:
