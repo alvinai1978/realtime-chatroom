@@ -2037,8 +2037,8 @@ export default function HomePage() {
     const voiceText = buildJarvisSpeechText(text);
     if (!voiceText) return;
 
-    // v15.14: ElevenLabs/MP3 pack first, then browser backup voice if API key/credits/voice ID fails.
-    // This keeps Bingo speaking even when ElevenLabs has 401/402/404/quota errors.
+    // v15.15: Strict ElevenLabs/MP3 voice mode.
+    // Do not use normal browser TTS backup, so users can clearly hear only the selected ElevenLabs/custom voice.
     setBingoMusicAudioVolume(true);
     const busyMs = estimateJarvisSpeechMs(voiceText);
     jarvisVoiceBusyUntilRef.current = Math.max(jarvisVoiceBusyUntilRef.current, Date.now() + busyMs);
@@ -2050,12 +2050,10 @@ export default function HomePage() {
       })
       .catch((error) => {
         const details = getErrorText(error);
-        console.warn('ElevenLabs/cloud TTS failed, using browser backup voice:', details);
-        setLiveKitVoiceStatus(`ElevenLabs failed; using browser backup voice. ${details}`);
-        const didSpeak = speakBrowserJarvisVoice(voiceText, text, 'Browser backup voice active');
-        if (!didSpeak) {
-          jarvisVoiceBusyUntilRef.current = Date.now() + busyMs;
-        }
+        console.warn('ElevenLabs/cloud TTS failed. Normal browser TTS backup is disabled:', details);
+        setBingoMusicAudioVolume(false);
+        setLiveKitVoiceStatus(`ElevenLabs voice failed. Normal TTS disabled. ${details}`);
+        jarvisVoiceBusyUntilRef.current = Date.now() + 1200;
       });
   }
 
@@ -2100,7 +2098,7 @@ export default function HomePage() {
       await room.startAudio?.();
       setLiveKitVoiceStatus('LiveKit connected. Start/run Jarvis Voice Agent');
     } catch (error) {
-      setLiveKitVoiceStatus(`Browser fallback active. LiveKit: ${getErrorText(error)}`);
+      setLiveKitVoiceStatus(`LiveKit unavailable. ElevenLabs/custom voice mode remains active. ${getErrorText(error)}`);
     }
   }
 

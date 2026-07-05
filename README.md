@@ -1,3 +1,41 @@
+# RIPPLE Jarvis Realtime Chatroom - v15.15 Strict ElevenLabs / No Normal TTS Fallback
+
+New in v15.15:
+
+- Disabled normal browser `speechSynthesis` backup during Bingo calls.
+- Jarvis will use ElevenLabs/server MP3 voice or MP3 voice pack only.
+- If ElevenLabs fails because of API key, voice ID, credits, payment, or quota, Jarvis will show the error status instead of speaking with normal TTS.
+- Keeps v15.13 behavior: first number call in Tagalog, repeat in English, unique Pinoy Bingo jokes, and wait-for-voice before next call.
+
+Deploy files from this package, then run:
+
+```powershell
+cd D:\realtime-chatroom
+npm install
+npm run build
+git add app/page.tsx app/globals.css app/api/livekit-token/route.ts app/api/tts/route.ts package.json tsconfig.json README.md public
+git commit -m "Disable normal TTS backup for ElevenLabs Bingo voice"
+git push
+vercel --prod
+```
+
+Debug ElevenLabs after deploy:
+
+```powershell
+$body = @{
+  text = "Tawag bilang isa. B, labing dalawa. I repeat, B, twelve."
+  debug = $true
+} | ConvertTo-Json -Compress
+
+Invoke-RestMethod `
+  -Uri "https://YOUR-PRODUCTION-DOMAIN/api/tts?debug=1" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+---
+
 # RIPPLE Jarvis Realtime Chatroom - v15.13 Tagalog First Call + English Repeat + No-Repeat Pinoy Bingo Jokes
 
 New in v15.13:
