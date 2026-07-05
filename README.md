@@ -1,6 +1,36 @@
-# Realtime Chatroom Jarvis v15.9
+# Realtime Chatroom Jarvis v15.10
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, Jarvis-hosted Bingo, MP3 music, and webOS TV-safe voice playback.
+
+
+## New in v15.10 - ElevenLabs Strict Voice Fix
+
+- Jarvis Voice now forces server MP3 / ElevenLabs voice mode on all devices.
+- Removed silent browser `speechSynthesis` fallback during cloud TTS mode.
+- If ElevenLabs is not configured or fails, the app shows `ElevenLabs not active` instead of playing normal browser TTS.
+- Added `GET /api/tts` diagnostics. It returns whether `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` are present without exposing the actual secrets.
+- The TTS route adds `x-ripple-tts-provider: elevenlabs` on successful MP3 responses.
+
+### ElevenLabs diagnostic test
+
+After deploy, open this in the browser:
+
+```text
+https://YOUR-APP.vercel.app/api/tts
+```
+
+It should show:
+
+```json
+{
+  "provider": "elevenlabs",
+  "configured": true,
+  "hasApiKey": true,
+  "hasVoiceId": true
+}
+```
+
+If `configured` is false, re-add the Vercel environment variables and redeploy.
 
 ## New in v15.9 - webOS TV TTS Compatibility
 

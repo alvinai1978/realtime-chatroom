@@ -1842,30 +1842,17 @@ export default function HomePage() {
     const voiceText = buildJarvisSpeechText(text);
     if (!voiceText) return;
 
-    const useTvSafeTts = webOsTtsMode || isLikelyWebOsTv();
+    // v15.10: use server MP3 / ElevenLabs voice first on every device.
+    // No silent browser fallback here, so you can immediately know if ElevenLabs is not active.
+    const useCloudTts = true;
 
-    if (useTvSafeTts) {
+    if (useCloudTts) {
       setBingoMusicAudioVolume(true);
       void playCloudTtsVoice(voiceText, text).catch((error) => {
-        console.warn('webOS/cloud TTS skipped:', getErrorText(error));
+        const details = getErrorText(error);
+        console.warn('ElevenLabs/cloud TTS failed:', details);
         setBingoMusicAudioVolume(false);
-        setLiveKitVoiceStatus(`TV voice needs MP3 pack or ElevenLabs env: ${getErrorText(error)}`);
-
-        if ('speechSynthesis' in window) {
-          try {
-            const utterance = new SpeechSynthesisUtterance(voiceText);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.88;
-            utterance.pitch = 0.74;
-            utterance.volume = Math.max(0.15, Math.min(1, soundVolumes.call || 0.8));
-            utterance.onend = () => setBingoMusicAudioVolume(false);
-            utterance.onerror = () => setBingoMusicAudioVolume(false);
-            window.speechSynthesis.cancel();
-            window.speechSynthesis.speak(utterance);
-          } catch (speechError) {
-            console.warn('Browser voice fallback failed:', getErrorText(speechError));
-          }
-        }
+        setLiveKitVoiceStatus(`ElevenLabs not active: ${details}`);
       });
       return;
     }
@@ -1952,19 +1939,18 @@ export default function HomePage() {
       window.speechSynthesis.getVoices();
     }
 
-    const shouldUseTvSafeVoice = webOsTtsMode || isLikelyWebOsTv();
-    if (shouldUseTvSafeVoice) {
-      setWebOsTtsMode(true);
-      localStorage.setItem(WEBOS_TTS_STORAGE_KEY, '1');
-      getSharedAudioElementForVoice();
-    }
+    // v15.10: force server MP3 / ElevenLabs mode.
+    const shouldUseTvSafeVoice = true;
+    setWebOsTtsMode(true);
+    localStorage.setItem(WEBOS_TTS_STORAGE_KEY, '1');
+    getSharedAudioElementForVoice();
 
     lastJarvisSpokenMessageIdRef.current = messagesRef.current[messagesRef.current.length - 1]?.id ?? null;
     setJarvisVoiceEnabled(true);
     setSoundEnabled(true);
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus(shouldUseTvSafeVoice ? 'webOS TV voice mode ready' : 'Browser voice active. Jarvis will read the called numbers.');
+    setLiveKitVoiceStatus('ElevenLabs cloud voice mode ready. If it fails, normal browser TTS will not play.');
     speakJarvisText('Jarvis Voice is on. I will read the called numbers in English.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
