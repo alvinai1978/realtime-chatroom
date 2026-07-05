@@ -1,3 +1,27 @@
+# RIPPLE Jarvis Realtime Chatroom - v15.11 ElevenLabs Buffered TTS Debug Fix
+
+This update changes `/api/tts` from ElevenLabs streaming proxy mode to a buffered MP3 conversion mode for better Vercel and LG webOS compatibility. It also adds debug mode so POST errors return clear JSON instead of a silent 502.
+
+Debug test:
+
+```powershell
+curl.exe -i -X POST "https://YOUR-PRODUCTION-DOMAIN/api/tts?debug=1" -H "Content-Type: application/json" -d "{\"text\":\"Call number one. B, twelve.\",\"debug\":true}"
+```
+
+Normal MP3 test:
+
+```powershell
+Invoke-WebRequest `
+  -Uri "https://YOUR-PRODUCTION-DOMAIN/api/tts" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"text":"Call number one. B, twelve."}' `
+  -OutFile eleven-test.mp3
+Start-Process .\eleven-test.mp3
+```
+
+---
+
 # Realtime Chatroom Jarvis v15.10
 
 Messenger-style realtime chatroom gamit ang Next.js, Vercel, Supabase Realtime, NVIDIA AI, Jarvis-hosted Bingo, MP3 music, and webOS TV-safe voice playback.
