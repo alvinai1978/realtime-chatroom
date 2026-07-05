@@ -1722,15 +1722,23 @@ export default function HomePage() {
   }
 
   function buildJarvisSpeechText(value: string) {
-    const bingoCallMatch = value.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
-    if (bingoCallMatch) {
-      const number = Number(bingoCallMatch[3]);
-      const letter = bingoCallMatch[2].toUpperCase();
-      const englishNumber = numberToEnglishSpeech(number);
-      const joke = getPinoyBingoJoke(0, number);
-      // v15.20: Do not say draw sequence and do not say the extra marking reminder.
-      // Offline MP3 files are saved per Bingo number, so they must work in any random call order.
-      return `The next number is ${letter}, ${englishNumber}. I repeat, ${letter}, ${englishNumber}. ${joke}`;
+    const bingoCallParts = getBingoCallParts(value);
+    if (bingoCallParts) {
+      const { callIndex, letter, number } = bingoCallParts;
+      const calledLine = buildBingoCalledNumberLine(letter, number);
+      const joke = getPinoyBingoJoke(callIndex, number);
+
+      // v15.22: first and last call use special lines; regular calls say only the next number.
+      // We also include the numeric value so 59 cannot sound like only "nine" and 28 cannot sound like only "eight".
+      if (callIndex === 1) {
+        return `Eto na ang unang numero. ${calledLine}. I repeat, ${calledLine}. ${joke}`;
+      }
+
+      if (callIndex === 75) {
+        return `Eto na ang huling numero, pang 75 na bola ay ${calledLine}. I repeat, ${calledLine}. ${joke}`;
+      }
+
+      return `The next number is ${calledLine}. I repeat, ${calledLine}. ${joke}`;
     }
 
     const compact = cleanJarvisVoiceText(value);
@@ -1797,15 +1805,45 @@ export default function HomePage() {
     }
   }
 
-  function getBingoVoicePackSrc(value: string) {
-    const bingoCallMatch = value.match(/Bingo Call #?\d*\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
-    if (!bingoCallMatch) return '';
+  function getBingoCallParts(value: string) {
+    const bingoCallMatch = value.match(/Bingo Call #?(\d+)?\s*:?\s*([BINGO])-\s*(\d{1,2})/i);
+    if (!bingoCallMatch) return null;
 
-    const letter = bingoCallMatch[1].toLowerCase();
-    const number = Number(bingoCallMatch[2]);
-    if (!Number.isFinite(number) || number < 1 || number > 75) return '';
+    const callIndex = Number(bingoCallMatch[1] || 0);
+    const letter = bingoCallMatch[2].toUpperCase();
+    const number = Number(bingoCallMatch[3]);
+    if (!Number.isFinite(number) || number < 1 || number > 75) return null;
 
-    return `${WEBOS_VOICE_PACK_BASE}/${letter}-${number}.mp3`;
+    return { callIndex, letter, number };
+  }
+
+  function getBingoVoiceVariant(callIndex: number) {
+    if (callIndex === 1) return 'first';
+    if (callIndex === 75) return 'last';
+    return 'regular';
+  }
+
+  function buildBingoCalledNumberLine(letter: string, number: number) {
+    const englishNumber = numberToEnglishSpeech(number);
+    // v15.22: include the full number word plus the numeric value.
+    // This prevents TTS from sounding like it only said the ones digit, such as "nine" for 59.
+    return `${letter}, ${englishNumber}, number ${number}`;
+  }
+
+  function getBingoVoicePackSrcCandidates(value: string) {
+    const parts = getBingoCallParts(value);
+    if (!parts) return [];
+
+    const letter = parts.letter.toLowerCase();
+    const fileName = `${letter}-${parts.number}.mp3`;
+    const variant = getBingoVoiceVariant(parts.callIndex);
+
+    const candidates = [`${WEBOS_VOICE_PACK_BASE}/${variant}/${fileName}`];
+    if (variant === 'regular') {
+      // Backward-compatible fallback for older 75-file packs.
+      candidates.push(`${WEBOS_VOICE_PACK_BASE}/${fileName}`);
+    }
+    return candidates;
   }
 
   function getJarvisVoiceAudioElement() {
@@ -1881,18 +1919,22 @@ export default function HomePage() {
 
 
   async function tryPlayBingoVoicePack(value: string) {
-    const voicePackSrc = getBingoVoicePackSrc(value);
-    if (!voicePackSrc) return false;
+    const voicePackCandidates = getBingoVoicePackSrcCandidates(value);
+    if (!voicePackCandidates.length) return false;
 
-    try {
-      const response = await fetch(voicePackSrc, { method: 'HEAD', cache: 'force-cache' });
-      if (!response.ok) return false;
-      await playVoiceAudioUrl(voicePackSrc);
-      setLiveKitVoiceStatus('Offline ElevenLabs MP3 voice pack active');
-      return true;
-    } catch {
-      return false;
+    for (const voicePackSrc of voicePackCandidates) {
+      try {
+        const response = await fetch(voicePackSrc, { method: 'HEAD', cache: 'force-cache' });
+        if (!response.ok) continue;
+        await playVoiceAudioUrl(voicePackSrc);
+        setLiveKitVoiceStatus('Offline ElevenLabs MP3 voice pack active');
+        return true;
+      } catch {
+        // Try the next candidate, or fall back to cloud TTS after the loop.
+      }
     }
+
+    return false;
   }
 
   async function playCloudTtsVoice(voiceText: string, originalText: string) {
@@ -2115,8 +2157,8 @@ export default function HomePage() {
     setSoundEnabled(true);
     liveKitRoomRef.current?.disconnect();
     liveKitRoomRef.current = null;
-    setLiveKitVoiceStatus('Offline MP3 pack first, ElevenLabs cloud backup. Next-number voice format, no call-count mistakes.');
-    speakJarvisText('Naka-on na ang boses ni Jarvis. Gagamit muna ako ng offline MP3 voice pack kung naka-install na. Sasabihin ko ang next number, hindi ang call sequence, para tama kahit random ang draw order.', true);
+    setLiveKitVoiceStatus('Offline MP3 pack first, ElevenLabs cloud backup. First/regular/last call voice format enabled.');
+    speakJarvisText('Naka-on na ang boses ni Jarvis. Gagamit muna ako ng offline MP3 voice pack kung naka-install na. May special intro para sa unang bola, regular next number sa gitna, at huling bola sa pang pitumpu at lima.', true);
 
     const latestBingoCall = [...messagesRef.current].reverse().find((message) => message.event_type === 'bingo_call');
     if (latestBingoCall) {
